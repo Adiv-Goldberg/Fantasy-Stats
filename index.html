@@ -5,64 +5,501 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fantasy Stats</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-  <link rel="stylesheet" href="./styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
+  <style>
+    /* Inlined Core CSS ensures 100% instant rendering even if external CSS is cached or blocked */
+    :root {
+      --bg: #000000;
+      --surface: #0a0a0c;
+      --surface-elevated: #111114;
+      --border: #1e1e24;
+      --border-focus: #3f3f46;
+      --text-high: #ffffff;
+      --text-mid: #a1a1aa;
+      --text-low: #52525b;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-high);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    .shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem 1.5rem 4rem 1.5rem;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-high);
+    }
+
+    .nav-tabs {
+      display: flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-mid);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.45rem 1.1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .nav-btn:hover {
+      color: var(--text-high);
+    }
+
+    .nav-btn.active {
+      background: #ffffff;
+      color: #000000;
+      font-weight: 600;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--text-mid);
+      font-family: var(--mono);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.75rem;
+      border-radius: 20px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #71717a;
+    }
+
+    .dot.live {
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+    }
+
+    /* Views */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* Empty State */
+    .empty-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 5rem 2rem;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      margin-top: 1rem;
+    }
+
+    .empty-card svg {
+      width: 48px;
+      height: 48px;
+      stroke: var(--text-low);
+      margin-bottom: 1.25rem;
+    }
+
+    .empty-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-high);
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-sub {
+      font-size: 0.88rem;
+      color: var(--text-mid);
+      max-width: 420px;
+      margin-bottom: 1.75rem;
+      line-height: 1.5;
+    }
+
+    .btn-action {
+      background: #ffffff;
+      color: #000000;
+      border: 1px solid #ffffff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.55rem 1.25rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn-action:hover {
+      background: #e4e4e7;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .subnav {
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .subnav-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-mid);
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 0.4rem 0.85rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .subnav-btn:hover {
+      color: var(--text-high);
+      border-color: var(--border-focus);
+    }
+
+    .subnav-btn.active {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+      font-weight: 600;
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .ctrl-select,
+    .ctrl-input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-high);
+      font-size: 0.82rem;
+      padding: 0.42rem 0.75rem;
+      border-radius: 6px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+
+    .ctrl-select:focus,
+    .ctrl-input:focus {
+      border-color: var(--border-focus);
+    }
+
+    .ctrl-input {
+      width: 180px;
+    }
+
+    /* Table */
+    .table-box {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow-x: auto;
+      background: var(--surface);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    th {
+      padding: 0.75rem 1rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-mid);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-elevated);
+    }
+
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-high);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: var(--surface-elevated);
+    }
+
+    .tag {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-mid);
+      border: 1px solid var(--border);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+
+    .bold-win {
+      color: #ffffff !important;
+      font-weight: 700;
+    }
+
+    .muted-loss {
+      color: var(--text-low) !important;
+    }
+
+    .meta-bar {
+      margin-top: 0.75rem;
+      font-size: 0.75rem;
+      color: var(--text-low);
+      font-family: var(--mono);
+    }
+
+    /* Import Form */
+    .import-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .import-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .import-card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .form-group label {
+      font-size: 0.78rem;
+      color: var(--text-mid);
+      font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-high);
+      font-size: 0.85rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      border-color: var(--border-focus);
+    }
+
+    .form-row {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .form-row .form-group {
+      flex: 1;
+    }
+
+    .btn-submit {
+      background: #ffffff;
+      color: #000000;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.65rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: auto;
+      transition: background 0.15s ease;
+      font-family: inherit;
+    }
+
+    .btn-submit:hover {
+      background: #e4e4e7;
+    }
+
+    .alert {
+      margin-top: 1.5rem;
+      padding: 0.85rem 1.15rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .alert.success {
+      border-color: #27272a;
+      color: #ffffff;
+    }
+
+    .alert.error {
+      border-color: #ef4444;
+      color: #f87171;
+    }
+
+    .mono-input {
+      font-family: var(--mono);
+      font-size: 0.78rem !important;
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+      }
+      .nav-tabs {
+        width: 100%;
+        justify-content: center;
+      }
+      .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .filters {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .ctrl-input {
+        width: 100%;
+      }
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Top Header Navigation -->
-    <header class="navbar">
-      <div class="nav-left">
-        <span class="logo">FANTASY STATS</span>
+  <div class="shell">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <span class="brand-title">Fantasy Stats</span>
       </div>
 
-      <nav class="nav-center">
-        <button class="nav-link active" data-tab="history">History</button>
-        <button class="nav-link" data-tab="live">Live</button>
-        <button class="nav-link" data-tab="import">Import</button>
+      <nav class="nav-tabs">
+        <button class="nav-btn active" data-tab="history">History</button>
+        <button class="nav-btn" data-tab="live">Live</button>
+        <button class="nav-btn" data-tab="import">Import</button>
       </nav>
 
-      <div class="nav-right">
-        <div class="status-indicator-wrap" id="ws-status-wrap" title="Live Stream Status">
-          <span class="status-dot" id="ws-dot"></span>
-          <span class="status-label" id="ws-status-text">Connecting</span>
-        </div>
+      <div class="status-badge">
+        <span class="dot" id="ws-dot"></span>
+        <span id="ws-status-text">Connecting</span>
       </div>
     </header>
 
-    <main class="content">
-      <!-- 1. History View -->
-      <section id="tab-history" class="view-panel active">
-        <!-- Control Bar -->
+    <!-- 1. History View -->
+    <section id="tab-history" class="view active">
+      <!-- Empty State Shown When Zero Leagues Exist -->
+      <div class="empty-card" id="history-empty-card" style="display: none;">
+        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+        </svg>
+        <div class="empty-title">No Leagues Imported</div>
+        <p class="empty-sub">Import your ESPN or Sleeper league to view lifetime head-to-head records, matchup history, and player stats.</p>
+        <button class="btn-action" onclick="switchToTab('import')">Import League &rarr;</button>
+      </div>
+
+      <!-- Data State Shown When Leagues Exist -->
+      <div id="history-data-view">
         <div class="toolbar">
-          <div class="tab-pill-group">
-            <button class="pill active" id="btn-group-matchup">Matchups</button>
-            <button class="pill" id="btn-group-franchise">Franchises</button>
-            <button class="pill" id="btn-group-players">Players</button>
+          <div class="subnav">
+            <button class="subnav-btn active" id="btn-group-matchup">Matchups</button>
+            <button class="subnav-btn" id="btn-group-franchise">Franchises</button>
+            <button class="subnav-btn" id="btn-group-players">Players</button>
           </div>
 
-          <div class="filters-row">
-            <select id="super-league-select" class="select-input">
-              <option value="">Select League</option>
-            </select>
-            <select id="filter-year" class="select-input">
-              <option value="">All Seasons</option>
-            </select>
-            <select id="filter-week" class="select-input">
-              <option value="">All Weeks</option>
-            </select>
-            <select id="filter-franchise" class="select-input">
-              <option value="">All Franchises</option>
-            </select>
-            <input type="text" id="filter-search-input" class="search-input" placeholder="Search..." />
+          <div class="filters">
+            <select id="super-league-select" class="ctrl-select"></select>
+            <select id="filter-year" class="ctrl-select"></select>
+            <select id="filter-week" class="ctrl-select"></select>
+            <select id="filter-franchise" class="ctrl-select"></select>
+            <input type="text" id="filter-search-input" class="ctrl-input" placeholder="Filter..." />
           </div>
         </div>
 
-        <!-- Data Table -->
-        <div class="table-container">
-          <table class="data-table" id="history-table">
+        <div class="table-box">
+          <table>
             <thead id="history-table-headers">
               <tr>
                 <th>Season</th>
@@ -72,87 +509,91 @@
                 <th>Score</th>
                 <th>Score</th>
                 <th>Team B</th>
-                <th>Result</th>
+                <th>Winner</th>
               </tr>
             </thead>
             <tbody id="history-table-body">
               <tr>
-                <td colspan="8" class="empty-state">No leagues imported yet. Use the Import tab to import your league.</td>
+                <td colspan="8" style="text-align: center; color: var(--text-mid); padding: 3rem;">Loading records...</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <div class="table-meta" id="history-record-count">0 records</div>
-      </section>
+        <div class="meta-bar" id="history-record-count">0 records</div>
+      </div>
+    </section>
 
-      <!-- 2. Live Scoreboards View -->
-      <section id="tab-live" class="view-panel">
-        <div class="live-grid" id="live-scoreboards-container">
-          <div class="empty-state">No live matchups active. Scores will update here automatically during game days.</div>
-        </div>
-        <div class="ticker-box" id="live-ticker-container" style="display: none;">
-          <div class="ticker-header">Live Updates</div>
-          <div class="ticker-list" id="live-ticker-feed"></div>
-        </div>
-      </section>
+    <!-- 2. Live Scoreboards View -->
+    <section id="tab-live" class="view">
+      <div class="empty-card" id="live-empty-card">
+        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+        </svg>
+        <div class="empty-title">No Active Live Matchups</div>
+        <p class="empty-sub">Live scores stream here automatically during active game days once your league is imported.</p>
+        <button class="btn-action" onclick="switchToTab('import')">Import League &rarr;</button>
+      </div>
 
-      <!-- 3. Import View -->
-      <section id="tab-import" class="view-panel">
-        <div class="import-columns">
-          <!-- ESPN Import -->
-          <div class="import-pane">
-            <h2 class="pane-title">ESPN Fantasy</h2>
-            <form id="espn-import-form">
-              <div class="input-field">
-                <label for="espn-league-id">League ID</label>
-                <input type="text" id="espn-league-id" class="text-input" placeholder="e.g. 12345678" required />
-              </div>
-              <div class="input-row">
-                <div class="input-field">
-                  <label for="espn-season">Season</label>
-                  <input type="number" id="espn-season" class="text-input" value="2024" min="2000" max="2030" />
-                </div>
-                <div class="input-field">
-                  <label for="espn-sport">Sport</label>
-                  <select id="espn-sport" class="select-input">
-                    <option value="ffl">NFL</option>
-                    <option value="flb">Baseball</option>
-                    <option value="fba">Basketball</option>
-                  </select>
-                </div>
-              </div>
-              <div class="input-field">
-                <label for="espn-swid">SWID (Private Leagues)</label>
-                <input type="text" id="espn-swid" class="text-input font-mono" placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" />
-              </div>
-              <div class="input-field">
-                <label for="espn-s2">espn_s2 (Private Leagues)</label>
-                <textarea id="espn-s2" class="text-input font-mono" rows="2" placeholder="Cookie string"></textarea>
-              </div>
-              <button type="submit" class="action-btn" id="btn-submit-espn">Import ESPN</button>
-            </form>
-          </div>
+      <div id="live-container" style="display: none;"></div>
+    </section>
 
-          <!-- Sleeper Import -->
-          <div class="import-pane">
-            <h2 class="pane-title">Sleeper</h2>
-            <form id="sleeper-import-form">
-              <div class="input-field">
-                <label for="sleeper-league-id">League ID</label>
-                <input type="text" id="sleeper-league-id" class="text-input" placeholder="e.g. 104838491823901" required />
+    <!-- 3. Import View -->
+    <section id="tab-import" class="view">
+      <div class="import-grid">
+        <!-- ESPN -->
+        <div class="import-card">
+          <h2>ESPN Fantasy</h2>
+          <form id="espn-import-form">
+            <div class="form-group">
+              <label for="espn-league-id">League ID *</label>
+              <input type="text" id="espn-league-id" placeholder="e.g. 12345678" required />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="espn-season">Season</label>
+                <input type="number" id="espn-season" value="2024" min="2000" max="2030" />
               </div>
-              <div class="input-field">
-                <label for="sleeper-super-league">League Name (Optional)</label>
-                <input type="text" id="sleeper-super-league" class="text-input" placeholder="My Fantasy League" />
+              <div class="form-group">
+                <label for="espn-sport">Sport</label>
+                <select id="espn-sport">
+                  <option value="ffl">NFL</option>
+                  <option value="flb">Baseball</option>
+                  <option value="fba">Basketball</option>
+                </select>
               </div>
-              <button type="submit" class="action-btn" id="btn-submit-sleeper">Import Sleeper</button>
-            </form>
-          </div>
+            </div>
+            <div class="form-group">
+              <label for="espn-swid">SWID (Private Leagues)</label>
+              <input type="text" id="espn-swid" class="mono-input" placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" />
+            </div>
+            <div class="form-group">
+              <label for="espn-s2">espn_s2 Cookie (Private Leagues)</label>
+              <textarea id="espn-s2" class="mono-input" rows="2" placeholder="Cookie string from browser"></textarea>
+            </div>
+            <button type="submit" class="btn-submit" id="btn-submit-espn">Import ESPN League</button>
+          </form>
         </div>
 
-        <div id="import-notification" class="alert-bar" style="display: none;"></div>
-      </section>
-    </main>
+        <!-- Sleeper -->
+        <div class="import-card">
+          <h2>Sleeper</h2>
+          <form id="sleeper-import-form">
+            <div class="form-group">
+              <label for="sleeper-league-id">League ID *</label>
+              <input type="text" id="sleeper-league-id" placeholder="e.g. 104838491823901" required />
+            </div>
+            <div class="form-group">
+              <label for="sleeper-super-league">League Name</label>
+              <input type="text" id="sleeper-super-league" placeholder="Optional name" />
+            </div>
+            <div style="flex-grow: 1;"></div>
+            <button type="submit" class="btn-submit" id="btn-submit-sleeper">Import Sleeper League</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="import-notification" class="alert" style="display: none;"></div>
+    </section>
   </div>
 
   <script src="./api.js"></script>

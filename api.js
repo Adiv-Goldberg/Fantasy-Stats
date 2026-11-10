@@ -24,7 +24,10 @@ const appState = {
   searchQuery: "",
 };
 
-// Elements
+// DOM References
+const historyEmptyCard = document.getElementById("history-empty-card");
+const historyDataView = document.getElementById("history-data-view");
+
 const superLeagueSelect = document.getElementById("super-league-select");
 const filterYearSelect = document.getElementById("filter-year");
 const filterWeekSelect = document.getElementById("filter-week");
@@ -43,16 +46,21 @@ const espnForm = document.getElementById("espn-import-form");
 const sleeperForm = document.getElementById("sleeper-import-form");
 const importAlert = document.getElementById("import-notification");
 
-// Navigation Tabs
-document.querySelectorAll(".nav-link").forEach(link => {
-  link.addEventListener("click", () => {
-    document.querySelectorAll(".nav-link").forEach(l => l.classList.remove("active"));
-    document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+// Navigation Tabs Switcher
+window.switchToTab = function(tabName) {
+  document.querySelectorAll(".nav-btn").forEach(l => l.classList.remove("active"));
+  document.querySelectorAll(".view").forEach(p => p.classList.remove("active"));
 
-    link.classList.add("active");
-    const tabName = link.dataset.tab;
-    const panel = document.getElementById(`tab-${tabName}`);
-    if (panel) panel.classList.add("active");
+  const targetLink = document.querySelector(`.nav-btn[data-tab="${tabName}"]`);
+  if (targetLink) targetLink.classList.add("active");
+
+  const panel = document.getElementById(`tab-${tabName}`);
+  if (panel) panel.classList.add("active");
+};
+
+document.querySelectorAll(".nav-btn").forEach(link => {
+  link.addEventListener("click", () => {
+    window.switchToTab(link.dataset.tab);
   });
 });
 
@@ -104,14 +112,18 @@ async function loadLeagues() {
     const data = await res.json();
     appState.leagues = data;
 
-    superLeagueSelect.innerHTML = "";
-    if (data.length === 0) {
-      superLeagueSelect.innerHTML = `<option value="">No Leagues Imported</option>`;
-      historyTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">No leagues imported yet. Use the Import tab to add your league.</td></tr>`;
-      historyRecordCount.textContent = "0 records";
+    // IF NO DATA IMPORTED, PROMINENTLY SHOW EMPTY STATE
+    if (!data || data.length === 0) {
+      if (historyDataView) historyDataView.style.display = "none";
+      if (historyEmptyCard) historyEmptyCard.style.display = "flex";
       return;
     }
 
+    // DATA EXISTS: SHOW TABLE VIEW
+    if (historyEmptyCard) historyEmptyCard.style.display = "none";
+    if (historyDataView) historyDataView.style.display = "block";
+
+    superLeagueSelect.innerHTML = "";
     data.forEach(league => {
       const opt = document.createElement("option");
       opt.value = league.id;
@@ -127,7 +139,14 @@ async function loadLeagues() {
     updateFiltersForCurrentLeague();
     await fetchHistoryData();
   } catch (err) {
-    historyTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">Cannot connect to backend: ${err.message}</td></tr>`;
+    if (historyDataView) historyDataView.style.display = "none";
+    if (historyEmptyCard) {
+      historyEmptyCard.style.display = "flex";
+      const title = historyEmptyCard.querySelector(".empty-title");
+      if (title) title.textContent = "Backend Connecting";
+      const sub = historyEmptyCard.querySelector(".empty-sub");
+      if (sub) sub.textContent = "Connecting to backend service. If the server is waking up, refresh in a few moments.";
+    }
   }
 }
 
@@ -198,7 +217,7 @@ async function fetchHistoryData() {
     appState.historicalData = result.data || [];
     renderCurrentData();
   } catch (err) {
-    historyTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">Error fetching data: ${err.message}</td></tr>`;
+    historyTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-mid); padding: 3rem;">Error querying history: ${err.message}</td></tr>`;
   }
 }
 
@@ -238,7 +257,7 @@ function renderMatchupsTable() {
   historyTableBody.innerHTML = "";
 
   if (items.length === 0) {
-    historyTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">No matchups found.</td></tr>`;
+    historyTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-mid); padding: 3rem;">No matchups found matching filters.</td></tr>`;
     return;
   }
 
@@ -253,10 +272,10 @@ function renderMatchupsTable() {
     tr.innerHTML = `
       <td>${m.year}</td>
       <td>Week ${m.week}${m.is_playoffs ? ' (Playoffs)' : ''}</td>
-      <td><span class="tag-platform">${m.platform}</span></td>
+      <td><span class="tag">${m.platform}</span></td>
       <td>${escapeHtml(m.team_a_name)}</td>
-      <td class="${aWon ? 'win-highlight' : 'loss-highlight'}">${m.team_a_score.toFixed(2)}</td>
-      <td class="${bWon ? 'win-highlight' : (m.team_b_id ? 'loss-highlight' : '')}">${m.team_b_id ? m.team_b_score.toFixed(2) : '-'}</td>
+      <td class="${aWon ? 'bold-win' : 'muted-loss'}">${m.team_a_score.toFixed(2)}</td>
+      <td class="${bWon ? 'bold-win' : (m.team_b_id ? 'muted-loss' : '')}">${m.team_b_id ? m.team_b_score.toFixed(2) : '-'}</td>
       <td>${m.team_b_id ? escapeHtml(m.team_b_name) : 'BYE'}</td>
       <td>${aWon ? escapeHtml(m.team_a_name) : (bWon ? escapeHtml(m.team_b_name) : 'Tie')}</td>
     `;
@@ -293,7 +312,7 @@ function renderFranchiseTable() {
   historyTableBody.innerHTML = "";
 
   if (items.length === 0) {
-    historyTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">No franchise records found.</td></tr>`;
+    historyTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-mid); padding: 3rem;">No franchise records found.</td></tr>`;
     return;
   }
 
@@ -303,7 +322,7 @@ function renderFranchiseTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${idx + 1}</td>
-      <td class="win-highlight">${escapeHtml(f.name)}</td>
+      <td class="bold-win">${escapeHtml(f.name)}</td>
       <td>${f.owner_name ? escapeHtml(f.owner_name) : '-'}</td>
       <td>${f.wins}-${f.losses}-${f.ties}</td>
       <td>${(f.win_pct * 100).toFixed(1)}%</td>
@@ -342,7 +361,7 @@ function renderPlayersTable() {
   historyTableBody.innerHTML = "";
 
   if (items.length === 0) {
-    historyTableBody.innerHTML = `<tr><td colspan="7" class="empty-state">No player stats found.</td></tr>`;
+    historyTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-mid); padding: 3rem;">No player stats found.</td></tr>`;
     return;
   }
 
@@ -352,8 +371,8 @@ function renderPlayersTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${idx + 1}</td>
-      <td class="win-highlight">${escapeHtml(p.player_name)}</td>
-      <td><span class="tag-platform">${escapeHtml(p.position)}</span></td>
+      <td class="bold-win">${escapeHtml(p.player_name)}</td>
+      <td><span class="tag">${escapeHtml(p.position)}</span></td>
       <td>${p.appearances}</td>
       <td>${p.total_points.toFixed(2)}</td>
       <td>${p.avg_points.toFixed(2)}</td>
@@ -370,7 +389,7 @@ async function handleESPNSubmit(e) {
   const btn = document.getElementById("btn-submit-espn");
   btn.disabled = true;
   btn.textContent = "Importing...";
-  showAlert("Connecting to ESPN...", "info");
+  showAlert("Connecting to ESPN API...", "info");
 
   const payload = {
     league_id: document.getElementById("espn-league-id").value.trim(),
@@ -391,13 +410,14 @@ async function handleESPNSubmit(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "ESPN import failed.");
 
-    showAlert(data.message || "ESPN league imported.", "success");
+    showAlert(data.message || "ESPN league imported successfully.", "success");
     await loadLeagues();
+    switchToTab("history");
   } catch (err) {
     showAlert(err.message, "error");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Import ESPN";
+    btn.textContent = "Import ESPN League";
   }
 }
 
@@ -406,7 +426,7 @@ async function handleSleeperSubmit(e) {
   const btn = document.getElementById("btn-submit-sleeper");
   btn.disabled = true;
   btn.textContent = "Importing...";
-  showAlert("Connecting to Sleeper...", "info");
+  showAlert("Connecting to Sleeper API...", "info");
 
   const payload = {
     league_id: document.getElementById("sleeper-league-id").value.trim(),
@@ -424,20 +444,21 @@ async function handleSleeperSubmit(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Sleeper import failed.");
 
-    showAlert(data.message || "Sleeper league imported.", "success");
+    showAlert(data.message || "Sleeper league imported successfully.", "success");
     await loadLeagues();
+    switchToTab("history");
   } catch (err) {
     showAlert(err.message, "error");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Import Sleeper";
+    btn.textContent = "Import Sleeper League";
   }
 }
 
 function showAlert(msg, type = "info") {
   if (!importAlert) return;
   importAlert.textContent = msg;
-  importAlert.className = `alert-bar ${type}`;
+  importAlert.className = `alert ${type}`;
   importAlert.style.display = "block";
   if (type !== "info") {
     setTimeout(() => {

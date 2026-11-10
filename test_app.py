@@ -74,7 +74,7 @@ class TestFantasyStatsBackend(unittest.TestCase):
     def test_02_static_endpoints(self):
         res_index = self.client.get("/")
         self.assertEqual(res_index.status_code, 200)
-        self.assertIn("FANTASY STATS", res_index.text)
+        self.assertIn("Fantasy Stats", res_index.text)
 
         res_css = self.client.get("/styles.css")
         self.assertEqual(res_css.status_code, 200)
