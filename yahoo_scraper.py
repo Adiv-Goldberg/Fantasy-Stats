@@ -340,3 +340,4 @@ def scrape_yahoo_league(
         "league_name": platform_league.name,
         "super_league_id": super_league_id,
     }
+
