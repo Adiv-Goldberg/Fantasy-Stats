@@ -85,12 +85,15 @@ class ESPNAuthRequest(BaseModel):
     super_league_id: Optional[int] = None
     super_league_name: Optional[str] = "Fantasy SuperLeague"
     sport: Optional[str] = "ffl"
+    import_all_years: bool = True
 
 
 class SleeperImportRequest(BaseModel):
     league_id: str
+    token: Optional[str] = ""
     super_league_id: Optional[int] = None
     super_league_name: Optional[str] = "Fantasy SuperLeague"
+    import_all_years: bool = True
 
 
 class YahooImportRequest(BaseModel):
@@ -101,6 +104,7 @@ class YahooImportRequest(BaseModel):
     cookie: Optional[str] = ""
     super_league_id: Optional[int] = None
     super_league_name: Optional[str] = "Fantasy SuperLeague"
+    import_all_years: bool = True
 
 
 class CreateSuperLeagueRequest(BaseModel):
@@ -152,7 +156,8 @@ async def authenticate_and_import_espn(payload: ESPNAuthRequest, db: Session = D
             espn_s2=payload.espn_s2,
             super_league_id=super_league_id,
             db=db,
-            sport=payload.sport or "ffl"
+            sport=payload.sport or "ffl",
+            import_all_years=payload.import_all_years
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"ESPN Ingestion Error: {str(e)}")
@@ -166,7 +171,7 @@ async def authenticate_and_import_espn(payload: ESPNAuthRequest, db: Session = D
 
     return {
         "status": "success",
-        "message": f"Imported ESPN league {payload.league_id}.",
+        "message": f"Imported ESPN league {payload.league_id} ({len(scrape_result.get('imported_years', []))} season(s)).",
         "super_league_id": super_league_id,
         "details": scrape_result
     }
@@ -188,14 +193,17 @@ async def import_sleeper(payload: SleeperImportRequest, db: Session = Depends(ge
         result = scrape_sleeper_league(
             league_id=payload.league_id,
             super_league_id=super_league_id,
-            db=db
+            db=db,
+            token=payload.token,
+            import_all_years=payload.import_all_years
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Sleeper Ingestion Error: {str(e)}")
 
+    seasons_cnt = len(result.get("imported_seasons", []))
     return {
         "status": "success",
-        "message": f"Imported Sleeper league {payload.league_id}.",
+        "message": f"Imported Sleeper league {payload.league_id} ({seasons_cnt} season(s)).",
         "super_league_id": super_league_id,
         "details": result
     }
@@ -221,14 +229,16 @@ async def import_yahoo(payload: YahooImportRequest, db: Session = Depends(get_db
             year=payload.year,
             sport=payload.sport,
             access_token=payload.access_token,
-            cookie=payload.cookie
+            cookie=payload.cookie,
+            import_all_years=payload.import_all_years
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Yahoo Ingestion Error: {str(e)}")
 
+    seasons_cnt = len(result.get("imported_seasons", []))
     return {
         "status": "success",
-        "message": f"Imported Yahoo league {payload.league_id}.",
+        "message": f"Imported Yahoo league {payload.league_id} ({seasons_cnt} season(s)).",
         "super_league_id": super_league_id,
         "details": result
     }

@@ -1,6 +1,7 @@
 """
 ESPN Fantasy Sports API v3 Scraper and Ingestion Engine.
 Connects to ESPN Fantasy endpoints using SWID and espn_s2 session cookies,
+automatically discovers all historical seasons via previousSeasons,
 parses mMatchupScore, mRoster, and mTeam views, and populates the database models.
 """
 
@@ -64,7 +65,6 @@ def get_espn_cookies(swid: Optional[str] = None, espn_s2: Optional[str] = None) 
 
 
 def validate_espn_session(league_id: str, year: int, swid: str, espn_s2: str, sport: str = "ffl") -> Dict[str, Any]:
-    """Validates user credentials against ESPN API."""
     url = f"https://fantasy.espn.com/apis/v3/games/{sport}/seasons/{year}/segments/0/leagues/{league_id}"
     cookies = get_espn_cookies(swid, espn_s2)
     headers = get_espn_headers(swid, espn_s2)
@@ -77,7 +77,7 @@ def validate_espn_session(league_id: str, year: int, swid: str, espn_s2: str, sp
             league_name = data.get("settings", {}).get("name", f"ESPN League {league_id}")
             return {"success": True, "league_name": league_name}
         elif response.status_code in [401, 403]:
-            return {"success": False, "message": "ESPN authentication failed. Verify SWID and espn_s2 cookies."}
+            return {"success": False, "message": "ESPN authentication failed. Verify your SWID and espn_s2 cookies."}
         elif response.status_code == 404:
             return {"success": False, "message": f"League {league_id} not found for season {year}."}
         else:
@@ -264,17 +264,56 @@ def scrape_espn_league(
     espn_s2: str,
     super_league_id: int,
     db: Session,
-    sport: str = "ffl"
+    sport: str = "ffl",
+    import_all_years: bool = True
 ) -> Dict[str, Any]:
-    results = []
-    for year in years:
-        data = fetch_espn_season_data(league_id, year, swid, espn_s2, sport=sport)
-        pl = parse_and_store_espn_data(data, league_id, year, super_league_id, db)
-        results.append({"year": year, "success": True, "league_name": pl.name})
+    """
+    Scrapes an ESPN league across all historical years.
+    Automatically discovers past seasons via ESPN's previousSeasons or scans backwards.
+    """
+    discovered_years = set(years)
+    primary_year = max(years) if years else 2024
+
+    # 1. Fetch primary year to discover all historical seasons
+    try:
+        primary_data = fetch_espn_season_data(league_id, primary_year, swid, espn_s2, sport=sport)
+        status_info = primary_data.get("status", {})
+        prev_seasons = status_info.get("previousSeasons", [])
+        if isinstance(prev_seasons, list):
+            for y in prev_seasons:
+                if isinstance(y, int) and 2000 <= y <= 2030:
+                    discovered_years.add(y)
+
+        # Store primary year data
+        parse_and_store_espn_data(primary_data, league_id, primary_year, super_league_id, db)
+    except Exception as e:
+        raise ValueError(f"Could not load primary ESPN season {primary_year}: {str(e)}")
+
+    # 2. If import_all_years is True and previousSeasons didn't find much, scan backwards
+    if import_all_years and len(discovered_years) <= 1:
+        # Scan backwards up to 8 years
+        for yr in range(primary_year - 1, max(2018, primary_year - 8), -1):
+            try:
+                data = fetch_espn_season_data(league_id, yr, swid, espn_s2, sport=sport)
+                parse_and_store_espn_data(data, league_id, yr, super_league_id, db)
+                discovered_years.add(yr)
+            except Exception:
+                # Season doesn't exist for this league ID; stop scanning
+                break
+
+    # 3. Process any other discovered seasons not yet processed
+    for yr in sorted(discovered_years):
+        if yr == primary_year:
+            continue
+        try:
+            data = fetch_espn_season_data(league_id, yr, swid, espn_s2, sport=sport)
+            parse_and_store_espn_data(data, league_id, yr, super_league_id, db)
+        except Exception as e:
+            logger.debug(f"Could not fetch historical season {yr} for ESPN league {league_id}: {e}")
 
     return {
         "status": "success",
         "league_id": league_id,
         "super_league_id": super_league_id,
-        "imported_years": results
+        "imported_years": sorted(list(discovered_years))
     }

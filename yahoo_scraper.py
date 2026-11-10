@@ -1,12 +1,13 @@
 """
 Yahoo Fantasy Sports API Ingestion Engine.
 Connects to Yahoo Fantasy REST API (https://fantasysports.yahooapis.com/fantasy/v2/),
+automatically discovers and imports all historical seasons via renew keys or historical game IDs,
 parses league metadata, standings, and weekly scoreboards, and normalizes into the relational database schema.
 """
 
 import logging
 import requests
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 from models import PlatformLeague, Franchise, Matchup, PlayerStat
 
@@ -19,30 +20,60 @@ DEFAULT_USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 
-# Standard Yahoo Sport Game Codes
-SPORT_GAME_KEYS = {
-    "nfl": "nfl",
-    "mlb": "mlb",
-    "nba": "nba",
-    "nhl": "nhl",
+# Historical Game IDs by Sport
+HISTORICAL_GAME_IDS = {
+    "nfl": {
+        2024: "449",
+        2023: "423",
+        2022: "414",
+        2021: "406",
+        2020: "399",
+        2019: "390",
+        2018: "380",
+    },
+    "mlb": {
+        2024: "434",
+        2023: "416",
+        2022: "404",
+        2021: "398",
+        2020: "396",
+    },
+    "nba": {
+        2024: "454",
+        2023: "428",
+        2022: "418",
+        2021: "410",
+        2020: "402",
+    },
+    "nhl": {
+        2024: "453",
+        2023: "427",
+        2022: "419",
+        2021: "411",
+    }
 }
 
 
 def format_yahoo_league_key(league_id: str, sport: str = "nfl") -> str:
-    """
-    Formats the Yahoo league key. Accepts 'nfl.l.12345' or bare ID '12345'.
-    """
     lid = str(league_id).strip()
-    if ".l." in lid:
-        return lid
-    sport_key = SPORT_GAME_KEYS.get(sport.lower(), "nfl")
+    if ".l." in lid or "_" in lid:
+        return lid.replace("_", ".l.") if "_" in lid and ".l." not in lid else lid
+    sport_key = sport.lower()
     return f"{sport_key}.l.{lid}"
+
+
+def extract_numeric_id(league_key: str) -> str:
+    if ".l." in league_key:
+        return league_key.split(".l.")[-1]
+    if "_" in league_key:
+        return league_key.split("_")[-1]
+    return league_key
 
 
 def get_yahoo_headers_and_cookies(
     access_token: Optional[str] = None,
     cookie: Optional[str] = None
-) -> tuple[Dict[str, str], Dict[str, str]]:
+) -> Tuple[Dict[str, str], Dict[str, str]]:
     headers = {
         "User-Agent": DEFAULT_USER_AGENT,
         "Accept": "application/json",
@@ -83,37 +114,39 @@ def fetch_yahoo_endpoint(
             "Yahoo authentication failed. Please provide a valid Yahoo OAuth Access Token or session cookie."
         )
     elif resp.status_code == 404:
-        raise ValueError(f"Yahoo endpoint {endpoint_path} not found. Check your League ID.")
+        raise ValueError(f"Yahoo endpoint '{endpoint_path}' not found. Check your League ID.")
 
     resp.raise_for_status()
     return resp.json()
 
 
-def parse_and_store_yahoo_data(
+def parse_and_store_yahoo_season(
     league_key: str,
-    data: Dict[str, Any],
     year: int,
     super_league_id: int,
     db: Session,
     access_token: Optional[str] = None,
     cookie: Optional[str] = None,
     max_weeks: int = 18
-) -> PlatformLeague:
+) -> Tuple[PlatformLeague, Optional[str]]:
     """
-    Normalizes Yahoo API response into database models.
+    Scrapes a single season of a Yahoo league and returns (platform_league, renew_previous_key).
     """
+    data = fetch_yahoo_endpoint(f"league/{league_key}", access_token=access_token, cookie=cookie)
+
     fantasy_content = data.get("fantasy_content", {})
     league_data = fantasy_content.get("league", [])
 
+    meta = {}
     if isinstance(league_data, list) and len(league_data) > 0:
         meta = league_data[0]
     elif isinstance(league_data, dict):
         meta = league_data
-    else:
-        meta = {}
 
     league_name = meta.get("name", f"Yahoo League {league_key}")
     season_val = meta.get("season", year)
+    renew_key = meta.get("renew")
+
     try:
         season_year = int(season_val)
     except Exception:
@@ -138,7 +171,7 @@ def parse_and_store_yahoo_data(
         db.add(platform_league)
         db.flush()
 
-    # 2. Fetch Teams and Standings
+    # 2. Standings & Franchises
     team_franchise_map: Dict[str, Franchise] = {}
     try:
         standings_data = fetch_yahoo_endpoint(
@@ -201,7 +234,7 @@ def parse_and_store_yahoo_data(
     except Exception as e:
         logger.warning(f"Could not load Yahoo standings for {league_key}: {e}")
 
-    # 3. Weekly Matchups (Iterate weeks 1..max_weeks)
+    # 3. Weekly Matchups
     for week in range(1, max_weeks + 1):
         try:
             scoreboard_data = fetch_yahoo_endpoint(
@@ -299,7 +332,7 @@ def parse_and_store_yahoo_data(
             break
 
     db.commit()
-    return platform_league
+    return platform_league, renew_key
 
 
 def scrape_yahoo_league(
@@ -310,34 +343,73 @@ def scrape_yahoo_league(
     sport: str = "nfl",
     access_token: Optional[str] = None,
     cookie: Optional[str] = None,
-    max_weeks: int = 18
+    max_weeks: int = 18,
+    import_all_years: bool = True
 ) -> Dict[str, Any]:
     """
     Main ingestion entry point for Yahoo Fantasy Sports.
+    Traverses historical seasons via renew keys and historical game IDs.
     """
-    league_key = format_yahoo_league_key(league_id, sport)
-    data = fetch_yahoo_endpoint(
-        f"league/{league_key}",
-        access_token=access_token,
-        cookie=cookie
-    )
+    initial_key = format_yahoo_league_key(league_id, sport)
+    current_key = initial_key
+    imported_seasons = []
+    visited_keys = set()
 
-    platform_league = parse_and_store_yahoo_data(
-        league_key=league_key,
-        data=data,
-        year=year,
-        super_league_id=super_league_id,
-        db=db,
-        access_token=access_token,
-        cookie=cookie,
-        max_weeks=max_weeks
-    )
+    # 1. Primary season and follow renew chain backwards
+    while current_key and current_key not in visited_keys:
+        visited_keys.add(current_key)
+        try:
+            pl, renew_prev = parse_and_store_yahoo_season(
+                league_key=current_key,
+                year=year,
+                super_league_id=super_league_id,
+                db=db,
+                access_token=access_token,
+                cookie=cookie,
+                max_weeks=max_weeks
+            )
+            imported_seasons.append({"year": pl.year, "league_name": pl.name, "key": current_key})
+
+            if not import_all_years or not renew_prev:
+                break
+
+            current_key = format_yahoo_league_key(renew_prev, sport)
+        except Exception as e:
+            if len(imported_seasons) == 0:
+                raise
+            logger.warning(f"Stopped traversing Yahoo renew keys at {current_key}: {e}")
+            break
+
+    # 2. If renew key wasn't available, check historical game IDs for bare league IDs
+    if import_all_years and len(imported_seasons) <= 1:
+        raw_num = extract_numeric_id(initial_key)
+        hist_map = HISTORICAL_GAME_IDS.get(sport.lower(), {})
+        for hist_year, game_id in sorted(hist_map.items(), reverse=True):
+            if any(s["year"] == hist_year for s in imported_seasons):
+                continue
+            hist_key = f"{game_id}.l.{raw_num}"
+            if hist_key in visited_keys:
+                continue
+            visited_keys.add(hist_key)
+            try:
+                pl, _ = parse_and_store_yahoo_season(
+                    league_key=hist_key,
+                    year=hist_year,
+                    super_league_id=super_league_id,
+                    db=db,
+                    access_token=access_token,
+                    cookie=cookie,
+                    max_weeks=max_weeks
+                )
+                imported_seasons.append({"year": pl.year, "league_name": pl.name, "key": hist_key})
+            except Exception:
+                # Historical year not present for this league ID
+                pass
 
     return {
         "status": "success",
         "platform": "Yahoo",
-        "league_key": league_key,
-        "league_name": platform_league.name,
+        "league_key": initial_key,
         "super_league_id": super_league_id,
+        "imported_seasons": imported_seasons
     }
-

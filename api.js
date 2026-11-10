@@ -432,6 +432,7 @@ async function handleSleeperSubmit(e) {
 
   const payload = {
     league_id: document.getElementById("sleeper-league-id").value.trim(),
+    token: document.getElementById("sleeper-token") ? document.getElementById("sleeper-token").value.trim() : "",
     super_league_id: appState.currentSuperLeagueId,
     super_league_name: document.getElementById("sleeper-super-league").value.trim() || undefined,
   };

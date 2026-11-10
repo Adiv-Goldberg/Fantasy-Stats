@@ -1,7 +1,9 @@
 """
 Sleeper Fantasy Sports API Ingestion Engine.
-Connects to Sleeper's public REST API (https://api.sleeper.app/v1/league/),
-normalizes users, rosters, and weekly matchups into the standard database schema.
+Connects to Sleeper REST API (https://api.sleeper.app/v1/league/),
+supports private leagues with token/authorization header,
+automatically traverses previous_league_id to import all historical seasons,
+and normalizes users, rosters, and matchups into the standard database schema.
 """
 
 import logging
@@ -15,11 +17,24 @@ logger = logging.getLogger("sleeper_client")
 SLEEPER_BASE_URL = "https://api.sleeper.app/v1"
 
 
-def fetch_sleeper_league(league_id: str) -> Dict[str, Any]:
+def get_sleeper_headers(token: Optional[str] = None) -> Dict[str, str]:
+    headers = {
+        "Accept": "application/json",
+    }
+    if token and token.strip():
+        tok = token.strip()
+        headers["Authorization"] = tok
+    return headers
+
+
+def fetch_sleeper_league(league_id: str, token: Optional[str] = None) -> Dict[str, Any]:
     url = f"{SLEEPER_BASE_URL}/league/{league_id}"
-    resp = requests.get(url, timeout=12)
+    headers = get_sleeper_headers(token)
+    resp = requests.get(url, headers=headers, timeout=12)
     if resp.status_code == 404 or resp.text.strip() == "null":
         raise ValueError(f"League ID '{league_id}' was not found on Sleeper. Verify the league ID from your Sleeper league URL.")
+    elif resp.status_code in [401, 403]:
+        raise PermissionError("Private Sleeper league. Please provide your Sleeper Auth Token.")
     resp.raise_for_status()
     data = resp.json()
     if not data:
@@ -27,40 +42,48 @@ def fetch_sleeper_league(league_id: str) -> Dict[str, Any]:
     return data
 
 
-def fetch_sleeper_users(league_id: str) -> List[Dict[str, Any]]:
+def fetch_sleeper_users(league_id: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
     url = f"{SLEEPER_BASE_URL}/league/{league_id}/users"
-    resp = requests.get(url, timeout=12)
+    headers = get_sleeper_headers(token)
+    resp = requests.get(url, headers=headers, timeout=12)
     resp.raise_for_status()
     return resp.json()
 
 
-def fetch_sleeper_rosters(league_id: str) -> List[Dict[str, Any]]:
+def fetch_sleeper_rosters(league_id: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
     url = f"{SLEEPER_BASE_URL}/league/{league_id}/rosters"
-    resp = requests.get(url, timeout=12)
+    headers = get_sleeper_headers(token)
+    resp = requests.get(url, headers=headers, timeout=12)
     resp.raise_for_status()
     return resp.json()
 
 
-def fetch_sleeper_matchups(league_id: str, week: int) -> List[Dict[str, Any]]:
+def fetch_sleeper_matchups(league_id: str, week: int, token: Optional[str] = None) -> List[Dict[str, Any]]:
     url = f"{SLEEPER_BASE_URL}/league/{league_id}/matchups/{week}"
-    resp = requests.get(url, timeout=12)
+    headers = get_sleeper_headers(token)
+    resp = requests.get(url, headers=headers, timeout=12)
     resp.raise_for_status()
     return resp.json()
 
 
-def scrape_sleeper_league(
+def scrape_sleeper_season(
     league_id: str,
     super_league_id: int,
     db: Session,
+    token: Optional[str] = None,
     max_weeks: int = 18
-) -> Dict[str, Any]:
-    league_info = fetch_sleeper_league(league_id)
-    users = fetch_sleeper_users(league_id)
-    rosters = fetch_sleeper_rosters(league_id)
+) -> tuple[PlatformLeague, Optional[str]]:
+    """
+    Scrapes a single season of a Sleeper league and returns (platform_league, previous_league_id).
+    """
+    league_info = fetch_sleeper_league(league_id, token=token)
+    users = fetch_sleeper_users(league_id, token=token)
+    rosters = fetch_sleeper_rosters(league_id, token=token)
 
     season_str = league_info.get("season", "2024")
     year = int(season_str) if str(season_str).isdigit() else 2024
     league_name = league_info.get("name", f"Sleeper League {league_id}")
+    previous_league_id = league_info.get("previous_league_id")
 
     platform_league = db.query(PlatformLeague).filter_by(
         platform="Sleeper",
@@ -114,7 +137,7 @@ def scrape_sleeper_league(
 
     for week in range(1, max_weeks + 1):
         try:
-            weekly_matchups = fetch_sleeper_matchups(league_id, week)
+            weekly_matchups = fetch_sleeper_matchups(league_id, week, token=token)
             if not weekly_matchups:
                 continue
 
@@ -166,9 +189,8 @@ def scrape_sleeper_league(
                     db.add(matchup)
                     db.flush()
                 else:
-                    matchup = existing_matchup
-                    matchup.team_a_score = score_a
-                    matchup.team_b_score = score_b
+                    existing_matchup.team_a_score = score_a
+                    existing_matchup.team_b_score = score_b
 
                 for side, f_obj in [(side_a, f_a), (side_b, f_b)]:
                     if not side or not f_obj:
@@ -201,9 +223,50 @@ def scrape_sleeper_league(
             break
 
     db.commit()
+    return platform_league, previous_league_id
+
+
+def scrape_sleeper_league(
+    league_id: str,
+    super_league_id: int,
+    db: Session,
+    token: Optional[str] = None,
+    max_weeks: int = 18,
+    import_all_years: bool = True
+) -> Dict[str, Any]:
+    """
+    Main ingestion function for Sleeper league.
+    Traverses previous_league_id to import all historical seasons automatically.
+    """
+    current_lid = str(league_id).strip()
+    imported_leagues = []
+    visited_lids = set()
+
+    while current_lid and current_lid not in visited_lids:
+        visited_lids.add(current_lid)
+        try:
+            pl, prev_lid = scrape_sleeper_season(
+                league_id=current_lid,
+                super_league_id=super_league_id,
+                db=db,
+                token=token,
+                max_weeks=max_weeks
+            )
+            imported_leagues.append({"year": pl.year, "league_name": pl.name, "id": current_lid})
+
+            if not import_all_years or not prev_lid:
+                break
+
+            current_lid = str(prev_lid).strip()
+        except Exception as e:
+            if len(imported_leagues) == 0:
+                raise
+            logger.warning(f"Stopped traversing Sleeper seasons at {current_lid}: {e}")
+            break
+
     return {
         "status": "success",
         "league_id": league_id,
-        "league_name": platform_league.name,
         "super_league_id": super_league_id,
+        "imported_seasons": imported_leagues
     }

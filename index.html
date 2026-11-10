@@ -424,6 +424,61 @@
       font-size: 0.78rem !important;
     }
 
+    .guide-section {
+      margin-top: 2.5rem;
+      border-top: 1px solid var(--border);
+      padding-top: 2rem;
+    }
+
+    .guide-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      color: var(--text-high);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .guide-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .guide-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      font-size: 0.82rem;
+      color: var(--text-mid);
+      line-height: 1.6;
+    }
+
+    .guide-box h3 {
+      font-size: 0.88rem;
+      color: var(--text-high);
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+    }
+
+    .guide-box ol {
+      padding-left: 1.15rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+
+    .guide-box code {
+      background: var(--surface-elevated);
+      color: var(--text-high);
+      padding: 0.15rem 0.35rem;
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      border: 1px solid var(--border);
+    }
+
     @media (max-width: 768px) {
       .header {
         flex-direction: column;
@@ -586,6 +641,10 @@
               <label for="sleeper-super-league">League Name</label>
               <input type="text" id="sleeper-super-league" placeholder="Optional name" />
             </div>
+            <div class="form-group">
+              <label for="sleeper-token">Auth Token (Private Leagues)</label>
+              <input type="text" id="sleeper-token" class="mono-input" placeholder="Token from browser localStorage" />
+            </div>
             <div style="flex-grow: 1;"></div>
             <button type="submit" class="btn-submit" id="btn-submit-sleeper">Import Sleeper League</button>
           </form>
@@ -625,6 +684,43 @@
       </div>
 
       <div id="import-notification" class="alert" style="display: none;"></div>
+
+      <!-- How to Get Import Values Guide -->
+      <div class="guide-section">
+        <h2 class="guide-title">How to Get Import Values</h2>
+        <div class="guide-grid">
+          <!-- ESPN Guide -->
+          <div class="guide-box">
+            <h3>ESPN Fantasy</h3>
+            <ol>
+              <li><strong>League ID:</strong> Log into ESPN Fantasy in your browser. Look at the URL in your address bar: <code>leagueId=12345678</code>. That number is your League ID.</li>
+              <li><strong>SWID & espn_s2 (Private):</strong> On any <code>espn.com</code> page, open Developer Tools (press <code>F12</code> or right-click &gt; <em>Inspect</em>).</li>
+              <li>Go to the <strong>Application</strong> tab (or <strong>Storage</strong> in Firefox), expand <strong>Cookies</strong>, and click <code>https://espn.com</code>.</li>
+              <li>Find <code>SWID</code> and copy its full value including curly braces: <code>{XXXXXXXX-XXXX-...}</code>.</li>
+              <li>Find <code>espn_s2</code> and copy the full long token string.</li>
+            </ol>
+          </div>
+
+          <!-- Sleeper Guide -->
+          <div class="guide-box">
+            <h3>Sleeper</h3>
+            <ol>
+              <li><strong>League ID:</strong> Open your league on <code>sleeper.com</code>. The URL looks like: <code>sleeper.com/leagues/104838491823901/matchup</code>. The long number is your League ID. (On mobile, tap league settings &gt; share to get the link).</li>
+              <li><strong>Public Leagues:</strong> No cookies or auth tokens needed. Just enter the League ID.</li>
+              <li><strong>Private Leagues:</strong> Log into <code>sleeper.com</code>, press <code>F12</code> &gt; <strong>Application</strong> tab &gt; <strong>Local Storage</strong> &gt; <code>https://sleeper.com</code> &gt; copy the <code>token</code> value.</li>
+            </ol>
+          </div>
+
+          <!-- Yahoo Guide -->
+          <div class="guide-box">
+            <h3>Yahoo Fantasy</h3>
+            <ol>
+              <li><strong>League ID / Key:</strong> Open your Yahoo Fantasy league page. In the URL: <code>football.fantasysports.yahoo.com/f1/123456</code>. <code>123456</code> is your League ID. You can enter <code>123456</code> or full key <code>nfl.l.123456</code>.</li>
+              <li><strong>Private Leagues:</strong> Press <code>F12</code> &gt; <strong>Application</strong> tab &gt; <strong>Cookies</strong> &gt; <code>https://fantasysports.yahooapis.com</code> (or <code>yahoo.com</code>). Copy the <code>B</code>, <code>T</code>, or <code>Y</code> cookie string, or paste an OAuth Bearer token from developer.yahoo.com.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
     </section>
   </div>
 

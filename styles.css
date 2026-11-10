@@ -409,6 +409,61 @@ tr:hover td {
   font-size: 0.78rem !important;
 }
 
+.guide-section {
+  margin-top: 2.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 2rem;
+}
+
+.guide-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  color: var(--text-high);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.guide-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  font-size: 0.82rem;
+  color: var(--text-mid);
+  line-height: 1.6;
+}
+
+.guide-box h3 {
+  font-size: 0.88rem;
+  color: var(--text-high);
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.guide-box ol {
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.guide-box code {
+  background: var(--surface-elevated);
+  color: var(--text-high);
+  padding: 0.15rem 0.35rem;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  border: 1px solid var(--border);
+}
+
 @media (max-width: 768px) {
   .header {
     flex-direction: column;
