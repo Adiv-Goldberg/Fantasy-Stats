@@ -3,272 +3,159 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fantasy-Stats | Cross-Platform Ingestion & Live Sync</title>
-  <!-- Sports Favicon -->
+  <title>Fantasy Stats</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-  <!-- Stylesheet -->
   <link rel="stylesheet" href="./styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="app-layout">
-    <!-- Sidebar Navigation -->
-    <aside class="sidebar">
-      <div class="brand">
-        <img src="./favicon.svg" alt="Football Logo" class="brand-icon" />
-        <div class="brand-text">
-          <span class="brand-title">Fantasy-Stats</span>
-          <span class="brand-subtitle">Cross-Platform Engine</span>
-        </div>
+  <div class="container">
+    <!-- Top Header Navigation -->
+    <header class="navbar">
+      <div class="nav-left">
+        <span class="logo">FANTASY STATS</span>
       </div>
 
-      <nav class="nav-menu">
-        <a href="#historical-section" class="nav-item active" id="nav-history">
-          <span class="nav-icon">📊</span>
-          <span>Historical Analytics</span>
-        </a>
-        <a href="#live-section" class="nav-item" id="nav-live">
-          <span class="nav-icon">⚡</span>
-          <span>Live Matchups</span>
-          <span class="badge pulse-badge" id="live-indicator">LIVE</span>
-        </a>
-        <a href="#import-section" class="nav-item" id="nav-import">
-          <span class="nav-icon">📥</span>
-          <span>Import Leagues</span>
-        </a>
+      <nav class="nav-center">
+        <button class="nav-link active" data-tab="history">History</button>
+        <button class="nav-link" data-tab="live">Live</button>
+        <button class="nav-link" data-tab="import">Import</button>
       </nav>
 
-      <div class="sidebar-footer">
-        <div class="backend-config-card" id="backend-config-card">
-          <label for="backend-url-input" class="config-label">API Backend URL:</label>
-          <div class="config-input-row">
-            <input type="text" id="backend-url-input" class="form-input font-mono" placeholder="Auto (Same host)" />
-            <button id="btn-save-backend-url" class="btn btn-secondary btn-sm" title="Save API URL">Save</button>
-          </div>
-        </div>
-
-        <div class="ws-status-card">
-          <div class="status-indicator" id="ws-dot"></div>
-          <div class="status-info">
-            <span class="status-label">Live Stream</span>
-            <span class="status-text" id="ws-status-text">Connecting...</span>
-          </div>
+      <div class="nav-right">
+        <div class="status-indicator-wrap" id="ws-status-wrap" title="Live Stream Status">
+          <span class="status-dot" id="ws-dot"></span>
+          <span class="status-label" id="ws-status-text">Connecting</span>
         </div>
       </div>
-    </aside>
+    </header>
 
-    <!-- Main Content Display Area -->
-    <main class="main-content">
-      <!-- Top Action Bar -->
-      <header class="top-bar">
-        <div class="league-selector-wrap">
-          <label for="super-league-select">SuperLeague:</label>
-          <select id="super-league-select" class="form-select">
-            <option value="">Loading leagues...</option>
-          </select>
-        </div>
-
-        <div class="header-actions">
-          <button class="btn btn-secondary" id="btn-refresh-data">
-            <span class="btn-icon">🔄</span> Refresh
-          </button>
-          <button class="btn btn-primary" id="btn-trigger-tick">
-            <span class="btn-icon">⚡</span> Push Live Update
-          </button>
-        </div>
-      </header>
-
-      <!-- Section: Live Matchup Scoreboards -->
-      <section id="live-section" class="dashboard-section">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">⚡ Real-Time Matchup Scoreboards</h2>
-            <p class="section-desc">Sub-second scores streamed over WebSocket from ESPN live polling</p>
+    <main class="content">
+      <!-- 1. History View -->
+      <section id="tab-history" class="view-panel active">
+        <!-- Control Bar -->
+        <div class="toolbar">
+          <div class="tab-pill-group">
+            <button class="pill active" id="btn-group-matchup">Matchups</button>
+            <button class="pill" id="btn-group-franchise">Franchises</button>
+            <button class="pill" id="btn-group-players">Players</button>
           </div>
-          <div class="live-meta">
-            <span class="meta-tag" id="last-update-time">Awaiting stream...</span>
-          </div>
-        </div>
 
-        <!-- Placeholder containers for the live matchup scoreboards -->
-        <div class="live-scoreboards-grid" id="live-scoreboards-container">
-          <!-- Dynamically populated or rendered via websocket.js -->
-          <div class="scoreboard-placeholder">Connecting to live game stream...</div>
-        </div>
-
-        <!-- Real-Time Event Feed -->
-        <div class="ticker-container">
-          <div class="ticker-title">🎙️ Live Game Event Stream</div>
-          <div class="ticker-feed" id="live-ticker-feed">
-            <div class="ticker-item muted">Listening for real-time play-by-play scoring events...</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Section: Historical Data Table & Filters -->
-      <section id="historical-section" class="dashboard-section">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">📊 Historical Data & Records</h2>
-            <p class="section-desc">Unified cross-platform matchups, franchise head-to-head records, and player stats</p>
-          </div>
-          <!-- View Grouping Controls -->
-          <div class="button-group" role="group">
-            <button class="btn btn-toggle active" id="btn-group-matchup">Group by Matchup</button>
-            <button class="btn btn-toggle" id="btn-group-franchise">Group by Franchise</button>
-            <button class="btn btn-toggle" id="btn-group-players">Player Stats</button>
-          </div>
-        </div>
-
-        <!-- Filter Controls Bar -->
-        <div class="filters-bar">
-          <div class="filter-group">
-            <label for="filter-year">Season:</label>
-            <select id="filter-year" class="form-select">
+          <div class="filters-row">
+            <select id="super-league-select" class="select-input">
+              <option value="">Select League</option>
+            </select>
+            <select id="filter-year" class="select-input">
               <option value="">All Seasons</option>
             </select>
-          </div>
-          <div class="filter-group" id="filter-week-wrap">
-            <label for="filter-week">Week:</label>
-            <select id="filter-week" class="form-select">
+            <select id="filter-week" class="select-input">
               <option value="">All Weeks</option>
-              <!-- 1 to 18 populated by JS -->
             </select>
-          </div>
-          <div class="filter-group">
-            <label for="filter-franchise">Franchise:</label>
-            <select id="filter-franchise" class="form-select">
+            <select id="filter-franchise" class="select-input">
               <option value="">All Franchises</option>
             </select>
-          </div>
-          <div class="filter-search">
-            <input type="text" id="filter-search-input" class="form-input" placeholder="Search team, owner, or player..." />
+            <input type="text" id="filter-search-input" class="search-input" placeholder="Search..." />
           </div>
         </div>
 
-        <!-- Main Display Table for Historical Data -->
-        <div class="table-card">
-          <div class="table-responsive">
-            <table class="data-table" id="history-table">
-              <thead id="history-table-headers">
-                <!-- Dynamically injected by api.js -->
-                <tr>
-                  <th>Season</th>
-                  <th>Week</th>
-                  <th>Platform</th>
-                  <th>Team A</th>
-                  <th>Score A</th>
-                  <th>Score B</th>
-                  <th>Team B</th>
-                  <th>Outcome</th>
-                </tr>
-              </thead>
-              <tbody id="history-table-body">
-                <!-- Dynamic rows injected by api.js -->
-                <tr>
-                  <td colspan="8" class="text-center py-4">Loading historical records...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="table-footer">
-            <span id="history-record-count">0 records found</span>
-          </div>
+        <!-- Data Table -->
+        <div class="table-container">
+          <table class="data-table" id="history-table">
+            <thead id="history-table-headers">
+              <tr>
+                <th>Season</th>
+                <th>Week</th>
+                <th>Platform</th>
+                <th>Team A</th>
+                <th>Score</th>
+                <th>Score</th>
+                <th>Team B</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body">
+              <tr>
+                <td colspan="8" class="empty-state">No leagues imported yet. Use the Import tab to import your league.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-meta" id="history-record-count">0 records</div>
+      </section>
+
+      <!-- 2. Live Scoreboards View -->
+      <section id="tab-live" class="view-panel">
+        <div class="live-grid" id="live-scoreboards-container">
+          <div class="empty-state">No live matchups active. Scores will update here automatically during game days.</div>
+        </div>
+        <div class="ticker-box" id="live-ticker-container" style="display: none;">
+          <div class="ticker-header">Live Updates</div>
+          <div class="ticker-list" id="live-ticker-feed"></div>
         </div>
       </section>
 
-      <!-- Section: Import Leagues (ESPN Auth & Sleeper Ingestion) -->
-      <section id="import-section" class="dashboard-section">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">📥 Ingestion Engine & Authentication</h2>
-            <p class="section-desc">Import and normalize private ESPN v3 leagues or public Sleeper leagues</p>
-          </div>
-        </div>
-
-        <div class="cards-grid">
-          <!-- ESPN Import Card -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-icon espn-color">🏈</div>
-              <div>
-                <h3 class="card-title">ESPN Fantasy Ingestion</h3>
-                <span class="card-subtitle">Undocumented v3 API with Session Cookies</span>
+      <!-- 3. Import View -->
+      <section id="tab-import" class="view-panel">
+        <div class="import-columns">
+          <!-- ESPN Import -->
+          <div class="import-pane">
+            <h2 class="pane-title">ESPN Fantasy</h2>
+            <form id="espn-import-form">
+              <div class="input-field">
+                <label for="espn-league-id">League ID</label>
+                <input type="text" id="espn-league-id" class="text-input" placeholder="e.g. 12345678" required />
               </div>
-            </div>
-            <form id="espn-import-form" class="card-body">
-              <div class="form-group">
-                <label for="espn-league-id">League ID *</label>
-                <input type="text" id="espn-league-id" class="form-input" placeholder="e.g. 12345678 or 'demo'" required />
-              </div>
-              <div class="form-row">
-                <div class="form-group col">
-                  <label for="espn-season">Season Year</label>
-                  <input type="number" id="espn-season" class="form-input" value="2024" min="2010" max="2026" />
+              <div class="input-row">
+                <div class="input-field">
+                  <label for="espn-season">Season</label>
+                  <input type="number" id="espn-season" class="text-input" value="2024" min="2000" max="2030" />
                 </div>
-                <div class="form-group col">
+                <div class="input-field">
                   <label for="espn-sport">Sport</label>
-                  <select id="espn-sport" class="form-select">
-                    <option value="ffl">NFL (ffl)</option>
-                    <option value="flb">Baseball (flb)</option>
-                    <option value="fba">Basketball (fba)</option>
+                  <select id="espn-sport" class="select-input">
+                    <option value="ffl">NFL</option>
+                    <option value="flb">Baseball</option>
+                    <option value="fba">Basketball</option>
                   </select>
                 </div>
               </div>
-              <div class="form-group">
-                <label for="espn-swid">SWID Cookie (Private Leagues)</label>
-                <input type="text" id="espn-swid" class="form-input font-mono" placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" />
-                <small class="form-help">Found in browser cookies under .espn.com</small>
+              <div class="input-field">
+                <label for="espn-swid">SWID (Private Leagues)</label>
+                <input type="text" id="espn-swid" class="text-input font-mono" placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" />
               </div>
-              <div class="form-group">
-                <label for="espn-s2">espn_s2 Cookie (Private Leagues)</label>
-                <textarea id="espn-s2" class="form-input font-mono" rows="2" placeholder="AEB..."></textarea>
-                <small class="form-help">Found in browser cookies under .espn.com</small>
+              <div class="input-field">
+                <label for="espn-s2">espn_s2 (Private Leagues)</label>
+                <textarea id="espn-s2" class="text-input font-mono" rows="2" placeholder="Cookie string"></textarea>
               </div>
-              <button type="submit" class="btn btn-primary btn-block" id="btn-submit-espn">
-                Import ESPN League
-              </button>
+              <button type="submit" class="action-btn" id="btn-submit-espn">Import ESPN</button>
             </form>
           </div>
 
-          <!-- Sleeper Import Card -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-icon sleeper-color">⚡</div>
-              <div>
-                <h3 class="card-title">Sleeper Ingestion</h3>
-                <span class="card-subtitle">Open REST API (No Cookies Required)</span>
+          <!-- Sleeper Import -->
+          <div class="import-pane">
+            <h2 class="pane-title">Sleeper</h2>
+            <form id="sleeper-import-form">
+              <div class="input-field">
+                <label for="sleeper-league-id">League ID</label>
+                <input type="text" id="sleeper-league-id" class="text-input" placeholder="e.g. 104838491823901" required />
               </div>
-            </div>
-            <form id="sleeper-import-form" class="card-body">
-              <div class="form-group">
-                <label for="sleeper-league-id">Sleeper League ID *</label>
-                <input type="text" id="sleeper-league-id" class="form-input" placeholder="e.g. 104838491823901 or 'demo'" required />
-                <small class="form-help">Copy from your Sleeper league URL</small>
+              <div class="input-field">
+                <label for="sleeper-super-league">League Name (Optional)</label>
+                <input type="text" id="sleeper-super-league" class="text-input" placeholder="My Fantasy League" />
               </div>
-              <div class="form-group">
-                <label for="sleeper-super-league">Assign to SuperLeague</label>
-                <input type="text" id="sleeper-super-league" class="form-input" placeholder="e.g. My Dynasty League" />
-              </div>
-              <div class="mt-auto">
-                <button type="submit" class="btn btn-accent btn-block" id="btn-submit-sleeper">
-                  Import Sleeper League
-                </button>
-              </div>
+              <button type="submit" class="action-btn" id="btn-submit-sleeper">Import Sleeper</button>
             </form>
           </div>
         </div>
 
-        <div id="import-notification" class="notification hidden"></div>
+        <div id="import-notification" class="alert-bar" style="display: none;"></div>
       </section>
     </main>
   </div>
 
-  <!-- Scripts -->
   <script src="./api.js"></script>
   <script src="./websocket.js"></script>
 </body>
 </html>
-

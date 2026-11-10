@@ -1,13 +1,21 @@
 /**
- * api.js - Client-Side Data Fetcher and DOM Manipulator
- * Communicates with FastAPI backend (/auth, /api/leagues, /api/history, /api/import/sleeper)
- * Normalizes and renders historical matchups, franchise standings, and player statistics.
+ * api.js - Data Fetcher and DOM Controller
+ * Default Backend: https://fantasy-stats-backend.onrender.com
  */
 
-// Global State
+const RENDER_BACKEND_URL = "https://fantasy-stats-backend.onrender.com";
+
+function getBackendUrl() {
+  const host = window.location.hostname;
+  if (host === "localhost" || host === "127.0.0.1") {
+    return "";
+  }
+  return RENDER_BACKEND_URL;
+}
+
 const appState = {
   currentSuperLeagueId: null,
-  currentGroupBy: "matchup", // "matchup" | "franchise" | "players"
+  currentGroupBy: "matchup",
   leagues: [],
   historicalData: [],
   filterYear: "",
@@ -16,23 +24,10 @@ const appState = {
   searchQuery: "",
 };
 
-// Backend Base URL Helper (supports GitHub Pages + Cloud Backend)
-function getBackendUrl() {
-  const stored = localStorage.getItem("fantasy_backend_url");
-  if (stored) return stored.trim().replace(/\/+$/, "");
-  if (window.location.hostname.endsWith("github.io")) {
-    return localStorage.getItem("fantasy_backend_url") || "";
-  }
-  return "";
-}
-
-// DOM Elements
-const backendUrlInput = document.getElementById("backend-url-input");
-const btnSaveBackendUrl = document.getElementById("btn-save-backend-url");
+// Elements
 const superLeagueSelect = document.getElementById("super-league-select");
 const filterYearSelect = document.getElementById("filter-year");
 const filterWeekSelect = document.getElementById("filter-week");
-const filterWeekWrap = document.getElementById("filter-week-wrap");
 const filterFranchiseSelect = document.getElementById("filter-franchise");
 const filterSearchInput = document.getElementById("filter-search-input");
 
@@ -40,22 +35,27 @@ const btnGroupMatchup = document.getElementById("btn-group-matchup");
 const btnGroupFranchise = document.getElementById("btn-group-franchise");
 const btnGroupPlayers = document.getElementById("btn-group-players");
 
-const historyTable = document.getElementById("history-table");
 const historyTableHeaders = document.getElementById("history-table-headers");
 const historyTableBody = document.getElementById("history-table-body");
 const historyRecordCount = document.getElementById("history-record-count");
 
-const btnRefreshData = document.getElementById("btn-refresh-data");
-const btnTriggerTick = document.getElementById("btn-trigger-tick");
-
 const espnForm = document.getElementById("espn-import-form");
 const sleeperForm = document.getElementById("sleeper-import-form");
-const importNotification = document.getElementById("import-notification");
+const importAlert = document.getElementById("import-notification");
 
+// Navigation Tabs
+document.querySelectorAll(".nav-link").forEach(link => {
+  link.addEventListener("click", () => {
+    document.querySelectorAll(".nav-link").forEach(l => l.classList.remove("active"));
+    document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
 
-// ==========================================
-// Initialization & Event Listeners
-// ==========================================
+    link.classList.add("active");
+    const tabName = link.dataset.tab;
+    const panel = document.getElementById(`tab-${tabName}`);
+    if (panel) panel.classList.add("active");
+  });
+});
+
 document.addEventListener("DOMContentLoaded", () => {
   initEventListeners();
   populateWeeksDropdown();
@@ -63,39 +63,16 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initEventListeners() {
-  if (backendUrlInput) {
-    backendUrlInput.value = localStorage.getItem("fantasy_backend_url") || "";
-  }
-  if (btnSaveBackendUrl) {
-    btnSaveBackendUrl.addEventListener("click", () => {
-      const val = backendUrlInput.value.trim();
-      if (val) {
-        localStorage.setItem("fantasy_backend_url", val);
-        showNotification(`Backend URL set to: ${val}`, "success");
-      } else {
-        localStorage.removeItem("fantasy_backend_url");
-        showNotification("Backend URL reset to default same-host.", "info");
-      }
-      if (window.liveSyncClient) {
-        window.liveSyncClient.reconnectWithNewUrl();
-      }
-      loadLeagues();
-    });
-  }
-
-  // SuperLeague selector change
   superLeagueSelect.addEventListener("change", (e) => {
     appState.currentSuperLeagueId = e.target.value ? parseInt(e.target.value) : null;
     updateFiltersForCurrentLeague();
     fetchHistoryData();
   });
 
-  // Group By Button Clicks
   btnGroupMatchup.addEventListener("click", () => switchGroupBy("matchup"));
   btnGroupFranchise.addEventListener("click", () => switchGroupBy("franchise"));
   btnGroupPlayers.addEventListener("click", () => switchGroupBy("players"));
 
-  // Filters change
   filterYearSelect.addEventListener("change", (e) => {
     appState.filterYear = e.target.value;
     fetchHistoryData();
@@ -116,40 +93,10 @@ function initEventListeners() {
     renderCurrentData();
   });
 
-  btnRefreshData.addEventListener("click", () => {
-    loadLeagues();
-  });
-
-  btnTriggerTick.addEventListener("click", async () => {
-    try {
-      btnTriggerTick.disabled = true;
-      btnTriggerTick.innerHTML = "Sending...";
-      await fetch(`${getBackendUrl()}/api/live/trigger-demo-tick`, { method: "POST" });
-    } catch (err) {
-      console.error("Error triggering tick:", err);
-    } finally {
-      setTimeout(() => {
-        btnTriggerTick.disabled = false;
-        btnTriggerTick.innerHTML = `<span class="btn-icon">⚡</span> Push Live Update`;
-      }, 500);
-    }
-  });
-
-  // ESPN Ingestion Form Submit
-  espnForm.addEventListener("submit", handleESPNSubmit);
-
-  // Sleeper Ingestion Form Submit
-  sleeperForm.addEventListener("submit", handleSleeperSubmit);
+  if (espnForm) espnForm.addEventListener("submit", handleESPNSubmit);
+  if (sleeperForm) sleeperForm.addEventListener("submit", handleSleeperSubmit);
 }
 
-
-// ==========================================
-// API Fetching Functions
-// ==========================================
-
-/**
- * Fetches all SuperLeagues and populates dropdowns.
- */
 async function loadLeagues() {
   try {
     const res = await fetch(`${getBackendUrl()}/api/leagues`);
@@ -159,14 +106,16 @@ async function loadLeagues() {
 
     superLeagueSelect.innerHTML = "";
     if (data.length === 0) {
-      superLeagueSelect.innerHTML = `<option value="">No Leagues Found</option>`;
+      superLeagueSelect.innerHTML = `<option value="">No Leagues Imported</option>`;
+      historyTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">No leagues imported yet. Use the Import tab to add your league.</td></tr>`;
+      historyRecordCount.textContent = "0 records";
       return;
     }
 
-    data.forEach((league, index) => {
+    data.forEach(league => {
       const opt = document.createElement("option");
       opt.value = league.id;
-      opt.textContent = `${league.name} (${league.sport}) - ${league.franchises_count} Franchises`;
+      opt.textContent = `${league.name} (${league.sport})`;
       superLeagueSelect.appendChild(opt);
     });
 
@@ -178,19 +127,14 @@ async function loadLeagues() {
     updateFiltersForCurrentLeague();
     await fetchHistoryData();
   } catch (err) {
-    console.error("Failed to load leagues:", err);
-    historyTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4" style="color: #f87171">Failed to connect to backend: ${err.message}</td></tr>`;
+    historyTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">Cannot connect to backend: ${err.message}</td></tr>`;
   }
 }
 
-/**
- * Updates Year and Franchise dropdown options based on selected SuperLeague.
- */
 function updateFiltersForCurrentLeague() {
   const current = appState.leagues.find(l => l.id === appState.currentSuperLeagueId);
   if (!current) return;
 
-  // Years from platform leagues
   const years = new Set();
   (current.platform_leagues || []).forEach(pl => years.add(pl.year));
   const sortedYears = Array.from(years).sort((a, b) => b - a);
@@ -199,16 +143,15 @@ function updateFiltersForCurrentLeague() {
   sortedYears.forEach(yr => {
     const opt = document.createElement("option");
     opt.value = yr;
-    opt.textContent = `${yr} Season`;
+    opt.textContent = `${yr}`;
     filterYearSelect.appendChild(opt);
   });
 
-  // Franchises
   filterFranchiseSelect.innerHTML = `<option value="">All Franchises</option>`;
   (current.franchises || []).forEach(f => {
     const opt = document.createElement("option");
     opt.value = f.id;
-    opt.textContent = `${f.name} (${f.owner_name || 'Owner'})`;
+    opt.textContent = f.name;
     filterFranchiseSelect.appendChild(opt);
   });
 }
@@ -223,9 +166,6 @@ function populateWeeksDropdown() {
   }
 }
 
-/**
- * Switches the active group-by tab and refetches data.
- */
 function switchGroupBy(newGroupBy) {
   appState.currentGroupBy = newGroupBy;
 
@@ -234,19 +174,13 @@ function switchGroupBy(newGroupBy) {
   if (newGroupBy === "franchise") btnGroupFranchise.classList.add("active");
   if (newGroupBy === "players") btnGroupPlayers.classList.add("active");
 
-  // Week filter is only meaningful for Matchup and Player stats
-  filterWeekWrap.style.display = (newGroupBy === "franchise") ? "none" : "flex";
+  filterWeekSelect.style.display = (newGroupBy === "franchise") ? "none" : "block";
 
   fetchHistoryData();
 }
 
-/**
- * Fetches historical data from /api/history based on current state.
- */
 async function fetchHistoryData() {
   if (!appState.currentSuperLeagueId) return;
-
-  historyTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">Querying unified records...</td></tr>`;
 
   const params = new URLSearchParams({
     super_league_id: appState.currentSuperLeagueId,
@@ -264,15 +198,9 @@ async function fetchHistoryData() {
     appState.historicalData = result.data || [];
     renderCurrentData();
   } catch (err) {
-    console.error("Failed to fetch history:", err);
-    historyTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4" style="color: #f87171">Error fetching data: ${err.message}</td></tr>`;
+    historyTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">Error fetching data: ${err.message}</td></tr>`;
   }
 }
-
-
-// ==========================================
-// DOM Rendering Functions
-// ==========================================
 
 function renderCurrentData() {
   if (appState.currentGroupBy === "matchup") {
@@ -284,10 +212,6 @@ function renderCurrentData() {
   }
 }
 
-/**
- * Renders Matchups view: constructs <tr> and <td> in memory,
- * applying .win-highlight and .loss-highlight dynamically.
- */
 function renderMatchupsTable() {
   historyTableHeaders.innerHTML = `
     <tr>
@@ -295,8 +219,8 @@ function renderMatchupsTable() {
       <th>Week</th>
       <th>Platform</th>
       <th>Team A</th>
-      <th>Score A</th>
-      <th>Score B</th>
+      <th>Score</th>
+      <th>Score</th>
       <th>Team B</th>
       <th>Winner</th>
     </tr>
@@ -306,17 +230,15 @@ function renderMatchupsTable() {
   if (appState.searchQuery) {
     items = items.filter(m =>
       (m.team_a_name && m.team_a_name.toLowerCase().includes(appState.searchQuery)) ||
-      (m.team_b_name && m.team_b_name.toLowerCase().includes(appState.searchQuery)) ||
-      (m.team_a_owner && m.team_a_owner.toLowerCase().includes(appState.searchQuery)) ||
-      (m.team_b_owner && m.team_b_owner.toLowerCase().includes(appState.searchQuery))
+      (m.team_b_name && m.team_b_name.toLowerCase().includes(appState.searchQuery))
     );
   }
 
-  historyRecordCount.textContent = `${items.length} matchup(s) displayed`;
+  historyRecordCount.textContent = `${items.length} records`;
   historyTableBody.innerHTML = "";
 
   if (items.length === 0) {
-    historyTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No matching matchups found.</td></tr>`;
+    historyTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">No matchups found.</td></tr>`;
     return;
   }
 
@@ -327,56 +249,17 @@ function renderMatchupsTable() {
 
     const aWon = m.team_a_score > m.team_b_score;
     const bWon = m.team_b_score > m.team_a_score;
-    const isTie = m.team_a_score === m.team_b_score && m.team_b_id !== null;
 
-    // Cells
-    const tdYear = document.createElement("td");
-    tdYear.textContent = m.year;
-
-    const tdWeek = document.createElement("td");
-    tdWeek.textContent = `Week ${m.week}${m.is_playoffs ? ' (Playoffs)' : ''}`;
-
-    const tdPlatform = document.createElement("td");
-    const badge = document.createElement("span");
-    badge.className = `badge-tag ${m.platform === 'ESPN' ? 'badge-espn' : 'badge-sleeper'}`;
-    badge.textContent = m.platform;
-    tdPlatform.appendChild(badge);
-
-    const tdTeamA = document.createElement("td");
-    tdTeamA.innerHTML = `<strong>${escapeHtml(m.team_a_name)}</strong> <small style="color:var(--text-muted)">(${escapeHtml(m.team_a_owner || '')})</small>`;
-
-    const tdScoreA = document.createElement("td");
-    tdScoreA.textContent = m.team_a_score.toFixed(2);
-    tdScoreA.className = aWon ? "win-highlight" : (bWon ? "loss-highlight" : (isTie ? "tie-highlight" : ""));
-
-    const tdScoreB = document.createElement("td");
-    tdScoreB.textContent = m.team_b_id ? m.team_b_score.toFixed(2) : "-";
-    tdScoreB.className = bWon ? "win-highlight" : (aWon && m.team_b_id ? "loss-highlight" : (isTie ? "tie-highlight" : ""));
-
-    const tdTeamB = document.createElement("td");
-    tdTeamB.innerHTML = m.team_b_id
-      ? `<strong>${escapeHtml(m.team_b_name)}</strong> <small style="color:var(--text-muted)">(${escapeHtml(m.team_b_owner || '')})</small>`
-      : `<span style="color:var(--text-muted)">BYE WEEK</span>`;
-
-    const tdOutcome = document.createElement("td");
-    if (aWon) {
-      tdOutcome.innerHTML = `<span class="badge-tag badge-win">🏆 ${escapeHtml(m.team_a_name)}</span>`;
-    } else if (bWon) {
-      tdOutcome.innerHTML = `<span class="badge-tag badge-win">🏆 ${escapeHtml(m.team_b_name)}</span>`;
-    } else if (isTie) {
-      tdOutcome.innerHTML = `<span class="badge-tag">🤝 Tie</span>`;
-    } else {
-      tdOutcome.innerHTML = `<span class="badge-tag">Bye</span>`;
-    }
-
-    tr.appendChild(tdYear);
-    tr.appendChild(tdWeek);
-    tr.appendChild(tdPlatform);
-    tr.appendChild(tdTeamA);
-    tr.appendChild(tdScoreA);
-    tr.appendChild(tdScoreB);
-    tr.appendChild(tdTeamB);
-    tr.appendChild(tdOutcome);
+    tr.innerHTML = `
+      <td>${m.year}</td>
+      <td>Week ${m.week}${m.is_playoffs ? ' (Playoffs)' : ''}</td>
+      <td><span class="tag-platform">${m.platform}</span></td>
+      <td>${escapeHtml(m.team_a_name)}</td>
+      <td class="${aWon ? 'win-highlight' : 'loss-highlight'}">${m.team_a_score.toFixed(2)}</td>
+      <td class="${bWon ? 'win-highlight' : (m.team_b_id ? 'loss-highlight' : '')}">${m.team_b_id ? m.team_b_score.toFixed(2) : '-'}</td>
+      <td>${m.team_b_id ? escapeHtml(m.team_b_name) : 'BYE'}</td>
+      <td>${aWon ? escapeHtml(m.team_a_name) : (bWon ? escapeHtml(m.team_b_name) : 'Tie')}</td>
+    `;
 
     fragment.appendChild(tr);
   });
@@ -384,17 +267,14 @@ function renderMatchupsTable() {
   historyTableBody.appendChild(fragment);
 }
 
-/**
- * Renders Standings/Franchise view: all-time records across all merged seasons.
- */
 function renderFranchiseTable() {
   historyTableHeaders.innerHTML = `
     <tr>
       <th>Rank</th>
       <th>Franchise</th>
       <th>Owner</th>
-      <th>Record (W-L-T)</th>
-      <th>Win Pct</th>
+      <th>Record</th>
+      <th>Win %</th>
       <th>Points For</th>
       <th>Points Against</th>
       <th>PPG</th>
@@ -409,11 +289,11 @@ function renderFranchiseTable() {
     );
   }
 
-  historyRecordCount.textContent = `${items.length} franchise(s) displayed`;
+  historyRecordCount.textContent = `${items.length} records`;
   historyTableBody.innerHTML = "";
 
   if (items.length === 0) {
-    historyTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No franchise records found.</td></tr>`;
+    historyTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">No franchise records found.</td></tr>`;
     return;
   }
 
@@ -421,60 +301,29 @@ function renderFranchiseTable() {
 
   items.forEach((f, idx) => {
     const tr = document.createElement("tr");
-
-    const isWinningRecord = f.win_pct >= 0.5;
-    const isLosingRecord = f.win_pct < 0.5 && f.games_played > 0;
-
-    const tdRank = document.createElement("td");
-    tdRank.innerHTML = `<strong>#${idx + 1}</strong>`;
-
-    const tdName = document.createElement("td");
-    tdName.innerHTML = `<strong>${escapeHtml(f.name)}</strong>`;
-
-    const tdOwner = document.createElement("td");
-    tdOwner.textContent = f.owner_name || "-";
-
-    const tdRecord = document.createElement("td");
-    tdRecord.textContent = `${f.wins}-${f.losses}-${f.ties}`;
-    tdRecord.className = isWinningRecord ? "win-highlight" : (isLosingRecord ? "loss-highlight" : "");
-
-    const tdWinPct = document.createElement("td");
-    tdWinPct.textContent = (f.win_pct * 100).toFixed(1) + "%";
-
-    const tdPF = document.createElement("td");
-    tdPF.textContent = f.points_for.toFixed(2);
-
-    const tdPA = document.createElement("td");
-    tdPA.textContent = f.points_against.toFixed(2);
-
-    const tdPPG = document.createElement("td");
-    tdPPG.textContent = f.ppg.toFixed(2);
-
-    tr.appendChild(tdRank);
-    tr.appendChild(tdName);
-    tr.appendChild(tdOwner);
-    tr.appendChild(tdRecord);
-    tr.appendChild(tdWinPct);
-    tr.appendChild(tdPF);
-    tr.appendChild(tdPA);
-    tr.appendChild(tdPPG);
-
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td class="win-highlight">${escapeHtml(f.name)}</td>
+      <td>${f.owner_name ? escapeHtml(f.owner_name) : '-'}</td>
+      <td>${f.wins}-${f.losses}-${f.ties}</td>
+      <td>${(f.win_pct * 100).toFixed(1)}%</td>
+      <td>${f.points_for.toFixed(2)}</td>
+      <td>${f.points_against.toFixed(2)}</td>
+      <td>${f.ppg.toFixed(2)}</td>
+    `;
     fragment.appendChild(tr);
   });
 
   historyTableBody.appendChild(fragment);
 }
 
-/**
- * Renders Top Player Stats view.
- */
 function renderPlayersTable() {
   historyTableHeaders.innerHTML = `
     <tr>
       <th>Rank</th>
-      <th>Player Name</th>
+      <th>Player</th>
       <th>Position</th>
-      <th>Appearances</th>
+      <th>Starts</th>
       <th>Total Points</th>
       <th>Avg PPG</th>
       <th>Max Score</th>
@@ -489,11 +338,11 @@ function renderPlayersTable() {
     );
   }
 
-  historyRecordCount.textContent = `${items.length} player(s) displayed`;
+  historyRecordCount.textContent = `${items.length} records`;
   historyTableBody.innerHTML = "";
 
   if (items.length === 0) {
-    historyTableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4">No player statistics found.</td></tr>`;
+    historyTableBody.innerHTML = `<tr><td colspan="7" class="empty-state">No player stats found.</td></tr>`;
     return;
   }
 
@@ -501,55 +350,27 @@ function renderPlayersTable() {
 
   items.forEach((p, idx) => {
     const tr = document.createElement("tr");
-
-    const tdRank = document.createElement("td");
-    tdRank.innerHTML = `<strong>#${idx + 1}</strong>`;
-
-    const tdName = document.createElement("td");
-    tdName.innerHTML = `<strong>${escapeHtml(p.player_name)}</strong>`;
-
-    const tdPos = document.createElement("td");
-    tdPos.innerHTML = `<span class="badge-tag">${escapeHtml(p.position)}</span>`;
-
-    const tdApp = document.createElement("td");
-    tdApp.textContent = p.appearances;
-
-    const tdTotal = document.createElement("td");
-    tdTotal.textContent = p.total_points.toFixed(2);
-    tdTotal.className = "win-highlight";
-
-    const tdAvg = document.createElement("td");
-    tdAvg.textContent = p.avg_points.toFixed(2);
-
-    const tdMax = document.createElement("td");
-    tdMax.textContent = p.max_points.toFixed(2);
-
-    tr.appendChild(tdRank);
-    tr.appendChild(tdName);
-    tr.appendChild(tdPos);
-    tr.appendChild(tdApp);
-    tr.appendChild(tdTotal);
-    tr.appendChild(tdAvg);
-    tr.appendChild(tdMax);
-
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td class="win-highlight">${escapeHtml(p.player_name)}</td>
+      <td><span class="tag-platform">${escapeHtml(p.position)}</span></td>
+      <td>${p.appearances}</td>
+      <td>${p.total_points.toFixed(2)}</td>
+      <td>${p.avg_points.toFixed(2)}</td>
+      <td>${p.max_points.toFixed(2)}</td>
+    `;
     fragment.appendChild(tr);
   });
 
   historyTableBody.appendChild(fragment);
 }
 
-
-// ==========================================
-// Ingestion Forms Handlers (ESPN & Sleeper)
-// ==========================================
-
 async function handleESPNSubmit(e) {
   e.preventDefault();
   const btn = document.getElementById("btn-submit-espn");
-  const origText = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = "Authenticating & Ingesting...";
-  showNotification("Connecting to ESPN Fantasy v3 API...", "info");
+  btn.textContent = "Importing...";
+  showAlert("Connecting to ESPN...", "info");
 
   const payload = {
     league_id: document.getElementById("espn-league-id").value.trim(),
@@ -568,27 +389,24 @@ async function handleESPNSubmit(e) {
     });
 
     const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.detail || "ESPN Authentication failed.");
-    }
+    if (!res.ok) throw new Error(data.detail || "ESPN import failed.");
 
-    showNotification(data.message || "ESPN league successfully ingested!", "success");
+    showAlert(data.message || "ESPN league imported.", "success");
     await loadLeagues();
   } catch (err) {
-    showNotification(`ESPN Ingestion Error: ${err.message}`, "error");
+    showAlert(err.message, "error");
   } finally {
     btn.disabled = false;
-    btn.innerHTML = origText;
+    btn.textContent = "Import ESPN";
   }
 }
 
 async function handleSleeperSubmit(e) {
   e.preventDefault();
   const btn = document.getElementById("btn-submit-sleeper");
-  const origText = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = "Ingesting Sleeper...";
-  showNotification("Ingesting Sleeper league...", "info");
+  btn.textContent = "Importing...";
+  showAlert("Connecting to Sleeper...", "info");
 
   const payload = {
     league_id: document.getElementById("sleeper-league-id").value.trim(),
@@ -604,27 +422,28 @@ async function handleSleeperSubmit(e) {
     });
 
     const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.detail || "Sleeper Ingestion failed.");
-    }
+    if (!res.ok) throw new Error(data.detail || "Sleeper import failed.");
 
-    showNotification(data.message || "Sleeper league successfully ingested!", "success");
+    showAlert(data.message || "Sleeper league imported.", "success");
     await loadLeagues();
   } catch (err) {
-    showNotification(`Sleeper Ingestion Error: ${err.message}`, "error");
+    showAlert(err.message, "error");
   } finally {
     btn.disabled = false;
-    btn.innerHTML = origText;
+    btn.textContent = "Import Sleeper";
   }
 }
 
-function showNotification(msg, type = "info") {
-  importNotification.textContent = msg;
-  importNotification.className = `notification ${type === "error" ? "error" : "success"}`;
-  importNotification.classList.remove("hidden");
-  setTimeout(() => {
-    importNotification.classList.add("hidden");
-  }, 6000);
+function showAlert(msg, type = "info") {
+  if (!importAlert) return;
+  importAlert.textContent = msg;
+  importAlert.className = `alert-bar ${type}`;
+  importAlert.style.display = "block";
+  if (type !== "info") {
+    setTimeout(() => {
+      importAlert.style.display = "none";
+    }, 6000);
+  }
 }
 
 function escapeHtml(str) {
@@ -636,4 +455,3 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
-
