@@ -171,6 +171,42 @@ body {
 .sidebar-footer {
   margin-top: auto;
   padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.backend-config-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  background-color: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.config-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.config-input-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.config-input-row input {
+  font-size: 0.75rem !important;
+  padding: 0.3rem 0.5rem !important;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.65rem !important;
+  font-size: 0.75rem !important;
 }
 
 .ws-status-card {

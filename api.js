@@ -16,7 +16,19 @@ const appState = {
   searchQuery: "",
 };
 
+// Backend Base URL Helper (supports GitHub Pages + Cloud Backend)
+function getBackendUrl() {
+  const stored = localStorage.getItem("fantasy_backend_url");
+  if (stored) return stored.trim().replace(/\/+$/, "");
+  if (window.location.hostname.endsWith("github.io")) {
+    return localStorage.getItem("fantasy_backend_url") || "";
+  }
+  return "";
+}
+
 // DOM Elements
+const backendUrlInput = document.getElementById("backend-url-input");
+const btnSaveBackendUrl = document.getElementById("btn-save-backend-url");
 const superLeagueSelect = document.getElementById("super-league-select");
 const filterYearSelect = document.getElementById("filter-year");
 const filterWeekSelect = document.getElementById("filter-week");
@@ -51,6 +63,26 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initEventListeners() {
+  if (backendUrlInput) {
+    backendUrlInput.value = localStorage.getItem("fantasy_backend_url") || "";
+  }
+  if (btnSaveBackendUrl) {
+    btnSaveBackendUrl.addEventListener("click", () => {
+      const val = backendUrlInput.value.trim();
+      if (val) {
+        localStorage.setItem("fantasy_backend_url", val);
+        showNotification(`Backend URL set to: ${val}`, "success");
+      } else {
+        localStorage.removeItem("fantasy_backend_url");
+        showNotification("Backend URL reset to default same-host.", "info");
+      }
+      if (window.liveSyncClient) {
+        window.liveSyncClient.reconnectWithNewUrl();
+      }
+      loadLeagues();
+    });
+  }
+
   // SuperLeague selector change
   superLeagueSelect.addEventListener("change", (e) => {
     appState.currentSuperLeagueId = e.target.value ? parseInt(e.target.value) : null;
@@ -92,7 +124,7 @@ function initEventListeners() {
     try {
       btnTriggerTick.disabled = true;
       btnTriggerTick.innerHTML = "Sending...";
-      await fetch("/api/live/trigger-demo-tick", { method: "POST" });
+      await fetch(`${getBackendUrl()}/api/live/trigger-demo-tick`, { method: "POST" });
     } catch (err) {
       console.error("Error triggering tick:", err);
     } finally {
@@ -120,7 +152,7 @@ function initEventListeners() {
  */
 async function loadLeagues() {
   try {
-    const res = await fetch("/api/leagues");
+    const res = await fetch(`${getBackendUrl()}/api/leagues`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     appState.leagues = data;
@@ -226,7 +258,7 @@ async function fetchHistoryData() {
   if (appState.filterFranchise) params.append("franchise_id", appState.filterFranchise);
 
   try {
-    const res = await fetch(`/api/history?${params.toString()}`);
+    const res = await fetch(`${getBackendUrl()}/api/history?${params.toString()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const result = await res.json();
     appState.historicalData = result.data || [];
@@ -529,7 +561,7 @@ async function handleESPNSubmit(e) {
   };
 
   try {
-    const res = await fetch("/auth", {
+    const res = await fetch(`${getBackendUrl()}/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -565,7 +597,7 @@ async function handleSleeperSubmit(e) {
   };
 
   try {
-    const res = await fetch("/api/import/sleeper", {
+    const res = await fetch(`${getBackendUrl()}/api/import/sleeper`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

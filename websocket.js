@@ -21,10 +21,29 @@ class LiveSyncClient {
   }
 
   getWebSocketUrl() {
+    const customBackend = localStorage.getItem("fantasy_backend_url");
+    if (customBackend) {
+      try {
+        const parsed = new URL(customBackend.trim());
+        const wsProtocol = parsed.protocol === "https:" ? "wss:" : "ws:";
+        return `${wsProtocol}//${parsed.host}/ws/live`;
+      } catch (e) {
+        console.warn("Invalid custom backend URL:", customBackend);
+      }
+    }
+
     // Connect to ws://localhost:8000/ws/live or dynamic host
     const host = window.location.host || "localhost:8000";
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     return `${protocol}//${host}/ws/live`;
+  }
+
+  reconnectWithNewUrl() {
+    if (this.ws) {
+      this.ws.close();
+    }
+    this.reconnectAttempts = 0;
+    this.connect();
   }
 
   init() {

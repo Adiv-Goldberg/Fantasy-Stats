@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fantasy-Stats | Cross-Platform Ingestion & Live Sync</title>
   <!-- Sports Favicon -->
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="./styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
       <div class="brand">
-        <img src="/favicon.svg" alt="Football Logo" class="brand-icon" />
+        <img src="./favicon.svg" alt="Football Logo" class="brand-icon" />
         <div class="brand-text">
           <span class="brand-title">Fantasy-Stats</span>
           <span class="brand-subtitle">Cross-Platform Engine</span>
@@ -41,6 +41,14 @@
       </nav>
 
       <div class="sidebar-footer">
+        <div class="backend-config-card" id="backend-config-card">
+          <label for="backend-url-input" class="config-label">API Backend URL:</label>
+          <div class="config-input-row">
+            <input type="text" id="backend-url-input" class="form-input font-mono" placeholder="Auto (Same host)" />
+            <button id="btn-save-backend-url" class="btn btn-secondary btn-sm" title="Save API URL">Save</button>
+          </div>
+        </div>
+
         <div class="ws-status-card">
           <div class="status-indicator" id="ws-dot"></div>
           <div class="status-info">
@@ -259,8 +267,8 @@
   </div>
 
   <!-- Scripts -->
-  <script src="/api.js"></script>
-  <script src="/websocket.js"></script>
+  <script src="./api.js"></script>
+  <script src="./websocket.js"></script>
 </body>
 </html>
 
