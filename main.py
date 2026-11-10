@@ -19,6 +19,7 @@ from database import engine, get_db, init_db
 from models import SuperLeague, PlatformLeague, Franchise, Matchup, PlayerStat
 from espn_scraper import scrape_espn_league, validate_espn_session
 from sleeper_client import scrape_sleeper_league
+from yahoo_scraper import scrape_yahoo_league
 from live_sync import LiveSyncService
 
 logger = logging.getLogger("main")
@@ -88,6 +89,16 @@ class ESPNAuthRequest(BaseModel):
 
 class SleeperImportRequest(BaseModel):
     league_id: str
+    super_league_id: Optional[int] = None
+    super_league_name: Optional[str] = "Fantasy SuperLeague"
+
+
+class YahooImportRequest(BaseModel):
+    league_id: str
+    year: int = 2024
+    sport: str = "nfl"
+    access_token: Optional[str] = ""
+    cookie: Optional[str] = ""
     super_league_id: Optional[int] = None
     super_league_name: Optional[str] = "Fantasy SuperLeague"
 
@@ -185,6 +196,39 @@ async def import_sleeper(payload: SleeperImportRequest, db: Session = Depends(ge
     return {
         "status": "success",
         "message": f"Imported Sleeper league {payload.league_id}.",
+        "super_league_id": super_league_id,
+        "details": result
+    }
+
+
+@app.post("/api/import/yahoo")
+async def import_yahoo(payload: YahooImportRequest, db: Session = Depends(get_db)):
+    super_league_id = payload.super_league_id
+    if not super_league_id:
+        sl = db.query(SuperLeague).filter_by(name=payload.super_league_name).first()
+        if not sl:
+            sl = SuperLeague(name=payload.super_league_name, sport=payload.sport.upper() if payload.sport else "NFL")
+            db.add(sl)
+            db.commit()
+            db.refresh(sl)
+        super_league_id = sl.id
+
+    try:
+        result = scrape_yahoo_league(
+            league_id=payload.league_id,
+            super_league_id=super_league_id,
+            db=db,
+            year=payload.year,
+            sport=payload.sport,
+            access_token=payload.access_token,
+            cookie=payload.cookie
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Yahoo Ingestion Error: {str(e)}")
+
+    return {
+        "status": "success",
+        "message": f"Imported Yahoo league {payload.league_id}.",
         "super_league_id": super_league_id,
         "details": result
     }

@@ -18,8 +18,13 @@ SLEEPER_BASE_URL = "https://api.sleeper.app/v1"
 def fetch_sleeper_league(league_id: str) -> Dict[str, Any]:
     url = f"{SLEEPER_BASE_URL}/league/{league_id}"
     resp = requests.get(url, timeout=12)
+    if resp.status_code == 404 or resp.text.strip() == "null":
+        raise ValueError(f"League ID '{league_id}' was not found on Sleeper. Verify the league ID from your Sleeper league URL.")
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    if not data:
+        raise ValueError(f"League ID '{league_id}' returned no data on Sleeper.")
+    return data
 
 
 def fetch_sleeper_users(league_id: str) -> List[Dict[str, Any]]:

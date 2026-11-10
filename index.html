@@ -476,7 +476,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
         </svg>
         <div class="empty-title">No Leagues Imported</div>
-        <p class="empty-sub">Import your ESPN or Sleeper league to view lifetime head-to-head records, matchup history, and player stats.</p>
+        <p class="empty-sub">Import your ESPN, Sleeper, or Yahoo league to view lifetime head-to-head records, matchup history, and player stats.</p>
         <button class="btn-action" onclick="switchToTab('import')">Import League &rarr;</button>
       </div>
 
@@ -588,6 +588,38 @@
             </div>
             <div style="flex-grow: 1;"></div>
             <button type="submit" class="btn-submit" id="btn-submit-sleeper">Import Sleeper League</button>
+          </form>
+        </div>
+
+        <!-- Yahoo Fantasy -->
+        <div class="import-card">
+          <h2>Yahoo Fantasy</h2>
+          <form id="yahoo-import-form">
+            <div class="form-group">
+              <label for="yahoo-league-id">League ID or Key *</label>
+              <input type="text" id="yahoo-league-id" placeholder="e.g. 123456 or nfl.l.123456" required />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="yahoo-season">Season</label>
+                <input type="number" id="yahoo-season" value="2024" min="2000" max="2030" />
+              </div>
+              <div class="form-group">
+                <label for="yahoo-sport">Sport</label>
+                <select id="yahoo-sport">
+                  <option value="nfl">NFL</option>
+                  <option value="mlb">Baseball</option>
+                  <option value="nba">Basketball</option>
+                  <option value="nhl">Hockey</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="yahoo-access-token">OAuth Access Token / Cookie</label>
+              <input type="text" id="yahoo-access-token" class="mono-input" placeholder="Bearer token or session cookie" />
+            </div>
+            <div style="flex-grow: 1;"></div>
+            <button type="submit" class="btn-submit" id="btn-submit-yahoo">Import Yahoo League</button>
           </form>
         </div>
       </div>

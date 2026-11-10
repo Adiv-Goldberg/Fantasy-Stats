@@ -113,6 +113,16 @@ class TestFantasyStatsBackend(unittest.TestCase):
             init_msg = websocket.receive_json()
             self.assertEqual(init_msg["type"], "connection_established")
 
+    def test_05_yahoo_import_endpoint(self):
+        # Test Yahoo import endpoint exists and rejects invalid credentials gracefully
+        res = self.client.post("/api/import/yahoo", json={
+            "league_id": "12345",
+            "year": 2024,
+            "sport": "nfl"
+        })
+        self.assertIn(res.status_code, [400, 401, 403])
+        self.assertIn("detail", res.json())
+
 
 if __name__ == "__main__":
     unittest.main()

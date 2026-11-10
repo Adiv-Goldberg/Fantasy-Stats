@@ -105,6 +105,10 @@ def fetch_espn_season_data(
     ]
 
     response = requests.get(url, headers=headers, cookies=cookies, params=params, timeout=20)
+    if response.status_code in [401, 403]:
+        raise PermissionError("ESPN authentication failed. Please verify your SWID and espn_s2 cookies for private leagues.")
+    elif response.status_code == 404:
+        raise ValueError(f"League ID '{league_id}' was not found on ESPN for season {year}.")
     response.raise_for_status()
     return response.json()
 

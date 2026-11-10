@@ -44,6 +44,7 @@ const historyRecordCount = document.getElementById("history-record-count");
 
 const espnForm = document.getElementById("espn-import-form");
 const sleeperForm = document.getElementById("sleeper-import-form");
+const yahooForm = document.getElementById("yahoo-import-form");
 const importAlert = document.getElementById("import-notification");
 
 // Navigation Tabs Switcher
@@ -103,6 +104,7 @@ function initEventListeners() {
 
   if (espnForm) espnForm.addEventListener("submit", handleESPNSubmit);
   if (sleeperForm) sleeperForm.addEventListener("submit", handleSleeperSubmit);
+  if (yahooForm) yahooForm.addEventListener("submit", handleYahooSubmit);
 }
 
 async function loadLeagues() {
@@ -452,6 +454,42 @@ async function handleSleeperSubmit(e) {
   } finally {
     btn.disabled = false;
     btn.textContent = "Import Sleeper League";
+  }
+}
+
+async function handleYahooSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById("btn-submit-yahoo");
+  btn.disabled = true;
+  btn.textContent = "Importing...";
+  showAlert("Connecting to Yahoo Fantasy API...", "info");
+
+  const payload = {
+    league_id: document.getElementById("yahoo-league-id").value.trim(),
+    year: parseInt(document.getElementById("yahoo-season").value) || 2024,
+    sport: document.getElementById("yahoo-sport").value,
+    access_token: document.getElementById("yahoo-access-token").value.trim(),
+    super_league_id: appState.currentSuperLeagueId,
+  };
+
+  try {
+    const res = await fetch(`${getBackendUrl()}/api/import/yahoo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Yahoo import failed.");
+
+    showAlert(data.message || "Yahoo league imported successfully.", "success");
+    await loadLeagues();
+    switchToTab("history");
+  } catch (err) {
+    showAlert(err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Import Yahoo League";
   }
 }
 
